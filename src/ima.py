@@ -7,6 +7,7 @@ import sys, json
 import numpy as np
 import math
 import include.config as cfg
+from include.data_config import num_config as datacfg
 #import include.configTest as cfg
 import include.constants as param
 import constants_digital as digi_param
@@ -14,8 +15,8 @@ import src.ima_modules as imod
 
 from data_convert import *
 
-phy2log_ratio = cfg.phy2log_ratio # ratio of physical to logical xbar
-# datamem_off is the start of address sapce of datamemory
+#phy2log_ratio = cfg.phy2log_ratio # ratio of physical to logical xbar / will not be used any more. replaced by datacfg.ReRAM_xbar_num
+# datamem_off is the start of address space of datamemory
 datamem_off = cfg.datamem_off # each matrix has 6 memory spaces (1 for f/b, 2 for d)
 my_xbar_count = 0
 
@@ -48,17 +49,25 @@ class ima (object):
             temp_outMem_dict = {'f':[], 'b':[], 'd':[]}
 
             for key in temp_xbar_dict:
-                phy2log_ratio = cfg.data_width/cfg.xbar_bits # ratio of physical to logical xbars
-                numXbar_temp = (2*phy2log_ratio) if (key == 'd') else (phy2log_ratio)
+                #phy2log_ratio = cfg.data_width/cfg.xbar_bits # ratio of physical to logical xbars
+                #numXbar_temp = (2*phy2log_ratio) if (key == 'd') else (phy2log_ratio)
 
                 # assign xbars to the dict elements
                 temp_list_xbar = []
-                for j in xrange (numXbar_temp):
-                    if (key != 'd'):
-                        temp_xbar = imod.xbar (cfg.xbar_size)
+                for resolution in datacfg.storage_config:
+                    if resolution != 's':
+                        resolution = int(resolution)
+                        if (key != 'd'):
+                            temp_xbar = imod.xbar (cfg.xbar_size, resolution)
+                            temp_list_xbar.append (temp_xbar)
+                        else:
+                            temp_xbar = imod.xbar_op (cfg.xbar_size, resolution)
+                            # For delta we have 2X width
+                            temp_list_xbar.append (temp_xbar)
+                            temp_list_xbar.append (temp_xbar)
                     else:
-                        temp_xbar = imod.xbar_op (cfg.xbar_size)
-                    temp_list_xbar.append (temp_xbar)
+                        # TODO add SRAM instantiate
+                        True
                 temp_xbar_dict[key] = temp_list_xbar
                 # assign input memory to mvmu
                 temp_inMem_dict[key] = imod.xb_inMem (cfg.xbar_size)
@@ -81,6 +90,7 @@ class ima (object):
                     temp_dacArray = imod.dac_array (cfg.xbar_size, cfg.dac_res)
                 else:
                     # 2-bit (=xbar_bits) are fed to columns of crossbar)
+                    # TODO needs to fix, since different res is needed.
                     temp_dacArray = imod.dac_array (cfg.xbar_size, 2*cfg.dac_res)
                 temp_dict[key] = temp_dacArray
             self.dacArray_list.append(temp_dict)
@@ -106,7 +116,7 @@ class ima (object):
 
         # Instantiate sample and hold
         self.snh_list = []
-        for i in xrange (2*cfg.num_matrix*phy2log_ratio):
+        for i in xrange (2 * cfg.num_matrix * datacfg.ReRAM_xbar_num):
             temp_snh = imod.sampleNhold (cfg.xbar_size)
             self.snh_list.append(temp_snh)
 
@@ -202,13 +212,16 @@ class ima (object):
     # Function to read the content of a matrix (from physical xbars to logical xbar)
     def get_matrix (self, mat_id, key):
         matrix = np.zeros((cfg.xbar_size, cfg.xbar_size))
-        num_xb = phy2log_ratio if (key in ['f', 'b']) else 2*phy2log_ratio
         for k in range (cfg.xbar_size):
             for l in range (cfg.xbar_size):
                 # read wt slices from delta xbar to compose a new weight
                 wt_new = 0.0
-                for m in range (num_xb):
-                    wt_new += self.matrix_list[mat_id][key][m].read(k,l) * (2 **(2*m)) # left shift by 2m, and subtraction by cfg.frac_bits to
+                for m in datacfg.ReRAM_xbar_num:
+                    if key in ['f', 'd']:
+                        wt_new += self.matrix_list[mat_id][key][m].read(k,l) * (2 ** (datacfg.storage_bit[m] - datacfg.frac_bits)) # left shift
+                    else:
+                        wt_new += self.matrix_list[mat_id][key][2 * m].read(k,l) * (2 ** (2 * datacfg.storage_bit[m] - datacfg.frac_bits)) # left shift
+                        wt_new += self.matrix_list[mat_id][key][2 * m + 1].read(k,l) * (2 ** (2 * datacfg.storage_bit[m] + datacfg.storage_config[m] - datacfg.frac_bits)) # left shift
                 matrix[k][l] = wt_new
         return matrix
 
@@ -227,7 +240,7 @@ class ima (object):
             # commmon to all instructions
             self.fd_instrn = self.instrnMem.read (self.pc) # update pipeline register (fetch/decode)
 
-            # A blan instruction signifies program end
+            # A blank instruction signifies program end
             if (self.fd_instrn != ''):
                 self.stage_empty[sId+1] = 0
                 self.stage_done[sId+1] = 0
@@ -286,7 +299,7 @@ class ima (object):
             if (dec_op == 'ld'):
                 assert (self.fd_instrn['r1'] >= datamem_off), 'load address for tile memory comes from data memory'
                 self.de_r1 = bin2int(self.dataMem.read(self.fd_instrn['r1']), cfg.addr_width) # absolute mem addr
-		assert (self.de_r1 >=0) # mem addr for load should be non negative
+                assert (self.de_r1 >=0) # mem addr for load should be non negative
                 self.de_d1 = self.fd_instrn['d1']
                 self.de_r2 = self.fd_instrn['imm'] # used for incrementing/decrementing counter for edram entries
                 self.de_vec = self.fd_instrn['vec']
@@ -301,7 +314,7 @@ class ima (object):
             elif (dec_op == 'st'):
                 assert (self.fd_instrn['d1'] >= datamem_off), 'store address for tile memory comes from data memory'
                 self.de_d1 = bin2int(self.dataMem.read(self.fd_instrn['d1']), cfg.addr_width) #absolute mem addr
-		assert (self.de_d1 >=0) # mem addr for store should be non negative
+                assert (self.de_d1 >=0) # mem addr for store should be non negative
                 self.de_r1 = self.fd_instrn['r1'] # reg addr
                 self.de_vec = self.fd_instrn['vec']
                 # source value will be read in execute stage
@@ -404,22 +417,6 @@ class ima (object):
         # define some common functions use dto address xbar memory spaces
         # xbar memory spaces are addressed as num_mvmu, f,b/d, i/o order
         # find [num_matrix, xbar_type, mem_addr, xbar_addr]
-        #def getXbarAddr (data_addr):
-        #    # find matrix id
-        #    num_matrix = data_addr / (6*cfg.xbar_size)
-        #    # find xbar_type (f, b, d)
-        #    matrix_addr = data_addr % (6*cfg.xbar_size) # address within the matrix
-        #    if (matrix_addr < 2*cfg.xbar_size):
-        #        xbar_type = 'f'
-        #    elif (matrix_addr >= 4*cfg.xbar_size):
-        #        xbar_type = 'd'
-        #    else:
-        #        xbar_type = 'b'
-        #    # find in/out memory
-        #    mem_addr = matrix_addr % (2*cfg.xbar_size)
-        #    xbar_addr = matrix_addr % cfg.xbar_size
-        #    return [num_matrix, xbar_type, mem_addr, xbar_addr]
-
         def getXbarAddr (data_addr):
             
             if (cfg.training):
@@ -427,7 +424,8 @@ class ima (object):
                 if (data_addr < cfg.num_matrix*3*cfg.xbar_size):
                     mem_addr = 0
                 else:
-                    mem_addr = 128
+                    # NOTE why? thinking if it would be better to have mem_addr = cfg.xbar_size Maybe as a mark it doesn't matter
+                    mem_addr = cfg.xbar_size
 
                 # find xbar_addr
                 xbar_addr = data_addr % cfg.xbar_size
@@ -452,7 +450,7 @@ class ima (object):
                 if (data_addr < cfg.num_matrix*1*cfg.xbar_size):
                     mem_addr = 0
                 else:
-                    mem_addr = 128
+                    mem_addr = cfg.xbar_size
 
                 # find xbar_addr
                 xbar_addr = data_addr % cfg.xbar_size
@@ -467,8 +465,8 @@ class ima (object):
                     xbar_type = 'f'
                 else:
                     assert (1==0), "xbar memory addressing failed"   
-
-	    return [num_matrix, xbar_type, mem_addr, xbar_addr]
+                    
+            return [num_matrix, xbar_type, mem_addr, xbar_addr]
 
         # write to the xbar memory (in/out) space depending on the address
         def writeToXbarMem (self, data_addr, data):
@@ -491,7 +489,6 @@ class ima (object):
                 return self.xb_outMem_list[matrix_id][xbar_type].read (xbar_addr)
 
         # Define what to do in execute (done for conciseness)
-        
         def do_execute (self, ex_op, fid):
 
             if (ex_op == 'ld'):
@@ -519,7 +516,7 @@ class ima (object):
                     if (dst_addr >= datamem_off):
                         self.dataMem.write(addr=dst_addr, data=self.de_val1, type_t='addr') #Updated for separate data_width and addr_width
                     else:
-			assert (1==0) # Set instructions cannot write to MVMU storage
+                        assert (1==0) # Set instructions cannot write to MVMU storage
                         writeToXbarMem (self, dst_addr, self.de_val1)
 
             elif (ex_op == 'cp'):
@@ -626,44 +623,45 @@ class ima (object):
                         #*************************************** HACK *********************************************
 
                         # convert digital values to analog
-                        out_dac = self.dacArray_list[mat_id][key].propagate_dummy(out_xb_inMem) #pass through
+                        out_dac = self.dacArray_list[mat_id][key].propagate(out_xb_inMem) #pass through
 
-                        # Do for (data_width/xbar_bits) xbars
-                        num_xb = int(math.ceil(float(cfg.weight_width) / cfg.xbar_bits))  # # of XBs change with quantization
-                        out_xbar = [[] for x in range(num_xb)]
-                        out_snh = [[] for x in range(num_xb)]
-                        for m in range (num_xb):
+                        # Do MVM in each xbar (weight is distributed)
+                        out_xbar = [[] for x in range(datacfg.ReRAM_xbar_num)]
+                        out_snh = [[] for x in range(datacfg.ReRAM_xbar_num)]
+                        for m in range (datacfg.ReRAM_xbar_num):
                             # compute dot-product
-                            out_xbar[m] = self.matrix_list[mat_id][key][m].propagate_dummy(out_dac, sparsity)        
-                            # do sampling and hold
-                            out_snh[m] = self.snh_list[mat_id*num_xb+m].propagate_dummy(out_xbar[m])
+                            out_xbar[m] = self.matrix_list[mat_id][key][m].propagate(out_dac, sparsity)
+                            # do sampling
+                            self.snh_list[mat_id * datacfg.ReRAM_xbar_num + m].propagate(out_xbar[m])
+                            # reads out from sample&hold 
+                            # NOTE: theoretically this should be done in the next loop. to minimize the change and simplify the code I put it here
+                            out_snh[m] = self.snh_list[mat_id * datacfg.ReRAM_xbar_num + m].read()
 
-                        # each of the num_xb produce shifted bits of output (weight bits have been distributed)
+                        # each of the xbar produce shifted bits of output (weight bits have been distributed)
                         for j in xrange (cfg.xbar_size): # this 'for' across xbar outs to adc happens via mux
-                            #out_sna = '0'*cfg.data_width # a zero for first sna
-                            out_sna = 0.0 # a zero for first sna
-                            for m in range (num_xb):
+                            out_sna = '0' * cfg.data_width # a zero for first sna
+                            for m in range (datacfg.ReRAM_xbar_num):
                                 # convert from analog to digital
-                                adc_id = (mat_id*num_xb + m) % cfg.num_adc
-                                out_mux1 = self.mux1_list[mat_id].propagate_dummy(out_snh[m][j]) # i is the ith xbar
-                                out_mux2 = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux1)
-                                out_adc = self.adc_list[adc_id].propagate_dummy(out_mux2, sparsity_adc)
+                                adc_id = (mat_id * datacfg.ReRAM_xbar_num + m) % cfg.num_adc
+                                out_mux1 = self.mux1_list[mat_id].propagate(out_snh[m], j) # i is the ith xbar
+                                out_mux2 = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux1) #dummy for directly getting input out, used to simplify the code
+                                out_adc = self.adc_list[adc_id].propagate(out_mux2, sparsity_adc) # gets jth value in this mth xbar
 
                                 # shift and add outputs from difefrent wt_bits
                                 alu_op = 'sna'
                                 #[out_sna, ovf] = self.alu_list[0].propagate (out_sna, out_adc, alu_op, \
                                 #        m * cfg.xbar_bits)
                                 [out_sna, ovf] = self.alu_list[0].propagate_float (out_sna, out_adc, alu_op, \
-                                        m*cfg.xbar_bits)
+                                        datacfg.storage_bit[m])
+                                # NOTE overflow not fixed in here
 
-                            # convert the inter-xbar sna output to fixed hereon
-                            out_sna = float2fixed(out_sna, cfg.int_bits, cfg.frac_bits)
+                            
                             # read from xbar's output register
                             out_xb_outMem = self.xb_outMem_list[mat_id][key].read (j)
                             # shift and add - make a dedicated sna unit -- PENDING
                             alu_op = 'sna'
                             # modify (len(out_adc) to adc_res) when ADC functionality is implemented
-                            [out_sna, ovf] = self.alu_list[0].propagate (out_xb_outMem, out_sna, alu_op, k*cfg.dac_res)
+                            [out_sna, ovf] = self.alu_list[0].propagate (out_xb_outMem, out_sna, alu_op, k * cfg.dac_res)
                             if (cfg.debug and ovf):
                                 fid.write ('IMA: ' + str(self.ima_id) + ' ALU Overflow Exception ' +\
                                         self.de_aluop + ' allowed to run')
@@ -676,6 +674,7 @@ class ima (object):
 
                 ## Define function to perform outer-product on specified mvmu
                 # NOTE: outer_product uses signed magnitude representations for positive and negative numbers
+                # TODO: for training this function is needed, not modified yet.
                 def outer_product (mat_id, key):
                     # read the bw-error to provide inputs across columns - read_a needs an energy/latency model - needs UPDATE
                     out_xb_outMem = self.xb_outMem_list[mat_id][key].read_p() # read entire xb_outMem
@@ -694,14 +693,14 @@ class ima (object):
                         # Note: 2X delta xbars than fw/bw xbars
                         num_xb = (2*cfg.data_width) / cfg.xbar_bits
                         for m in xrange (num_xb):
-                            out_dac1 = self.dacArray_list[mat_id]['d_r'].propagate_dummy (out_xb_inMem)
+                            out_dac1 = self.dacArray_list[mat_id]['d_r'].propagate (out_xb_inMem)
                             if (m == 0):
                                 temp = [val[-((m+1)*cfg.xbar_bits):] for val in out_xb_outMem_temp]
                             else:
                                 temp = [val[-((m+1)*cfg.xbar_bits):-(m*cfg.xbar_bits)] for val in out_xb_outMem_temp]
-                            out_dac2 = self.dacArray_list[mat_id]['d_c'].propagate_dummy (temp)
+                            out_dac2 = self.dacArray_list[mat_id]['d_c'].propagate (temp)
 
-                            self.matrix_list[mat_id][key][m].propagate_op_dummy (out_dac1, out_dac2, cfg.lr)
+                            self.matrix_list[mat_id][key][m].propagate_op (out_dac1, out_dac2, cfg.lr)
 
                 ## Traverse through the matrices in a core
                 if (cfg.training):
@@ -727,8 +726,8 @@ class ima (object):
 
             elif (ex_op == 'crs'):
                 # read weights from delta-xbar, synchronize, write to f/b xbars
-                num_xbD = (2*cfg.data_width) / cfg.xbar_bits
-                num_xbF = (cfg.data_width) / cfg.xbar_bits
+                num_xbD = 2 * datacfg.ReRAM_xbar_num
+                num_xbF = datacfg.ReRAM_xbar_num
                 for mat_id in range (cfg.num_matrix):
                     mask_temp = self.de_xb_nma[mat_id]
                     if (mask_temp == '1'):
@@ -737,19 +736,18 @@ class ima (object):
                                 # read wt slices from delta xbar to compose a new weight
                                 wt_new_float = 0.0
                                 for m in range (num_xbD):
-                                    wt_new_float += self.matrix_list[mat_id]['d'][m].read(k,l) * (2 **(2*m)) # left shift by 2m, and subtraction by cfg.frac_bits to
+                                    wt_new_float += self.matrix_list[mat_id]['d'][2 * m].read(k,l) * (2 ** (2 * datacfg.storage_bit[m] - datacfg.frac_bits)) # left shift
+                                    wt_new_float += self.matrix_list[mat_id]['d'][2 * m + 1].read(k,l) * (2 ** (2 * datacfg.storage_bit[m] + datacfg.storage_config[m] - datacfg.frac_bits)) # left shift
                                 # write wt slices to f and b xbar
                                 # captures precision loss, as values read from 16 xbars (32-bits) are converted to 16-bits
-                                wt_new_fixed = float2fixed (wt_new_float, cfg.int_bits, cfg.frac_bits)
+                                wt_new_fixed = float2fixed (wt_new_float, datacfg.int_bits, datacfg.frac_bits)
                                 for m in range (num_xbF):
-                                    if (m==0):
-                                        val = wt_new_fixed[-(m+1)*cfg.xbar_bits:]
-                                    else:
-                                        val = wt_new_fixed[-(m+1)*cfg.xbar_bits:-(m+1)*cfg.xbar_bits+2]
                                     # augment sign extension (used in MSB xbar only)
-                                    if (m == (num_xbF-1)):
-                                        val = (cfg.num_bits - cfg.xbar_bits)*val[0] + val[0:]
-                                    val_float = fixed2float(val, cfg.int_bits, cfg.frac_bits) # xbar_value in xbar stores float values
+                                    if (m == (num_xbF - 1)):
+                                        val = (datacfg.num_bits - datacfg.storage_bit[m])*val[0] + val[0:]
+                                    else:
+                                        val = wt_new_fixed[-1 * datacfg.storage_bit(m + 1): -1 * datacfg.storage_bit(m + 1) + int(datacfg.storage_config[m])]
+                                    val_float = fixed2float(val, datacfg.int_bits, datacfg.frac_bits) # xbar_value in xbar stores float values
                                     self.matrix_list[mat_id]['f'][m].write(k, l, val_float)
                                     self.matrix_list[mat_id]['b'][m].write(k, l, val_float)
 
@@ -774,7 +772,6 @@ class ima (object):
             elif (ex_op == 'hlt'): # for halt instruction
                 self.halt = 1
             # do nothing for nop instruction
-
 
         # Computes the latency for Analog mvm instruction based on DPE configuration
         def xbComputeLatency_Analog (self, mask):

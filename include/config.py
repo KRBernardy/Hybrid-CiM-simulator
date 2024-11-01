@@ -1,24 +1,22 @@
 # This file contains the configurable parameters in DPE (all hierarchies - IMA, Tile, Node)
 ## All user specified parameters are provided by this file only
 
+
+from data_config import num_config as datacfg
+
 ## Debug - 0 (1): dpe simulation will (won't) produce ima/tile traces while simulating
 cycles_max = 5000000 # Put both these to very large numbers (when design is bug-free)!
 debug = 1
 xbar_record = 1
 inference = 1
 training = not(inference)
-sparse_opt = 0 # Flag for Sparsity optimisaton (Make it 0 for only dense computations)
+sparse_opt = 1 # Flag for Sparsity optimisaton (Make it 0 for only dense computations)
 
 ## Variable to define the type of MVMU
 # One of "Analog", "Digital_V1" or "Digital_V2" 
 # Digital_V1 has compressed inputs (Data+Offset style)
 # Digital_V2 has uncompressed inputs (Skips computations for 0 activation)
 MVMU_ver = "Analog"
-
-## Operand precision (fixed point allowed only): num_bits = int_bits + frac_bits
-num_bits = 16
-int_bits = 4
-frac_bits = num_bits - int_bits
 
 ## IMA configurable parameters (permissible values for each parameter provided here)
 ## Instruction generation - affected by xbar_bits, num_xbar, xbar_size.
@@ -34,7 +32,8 @@ frac_bits = num_bits - int_bits
 
 # Fixed parameters
 addr_width = 22 # Added to address larger address space for conv layers (#TODO: Compiler needs to fix shared memory reuse)
-data_width = num_bits # (in bits)
+data_width = datacfg.num_bits # (in bits)
+
 xbdata_width = data_width # (in bits)
 instrn_width = 48 # (in bits)
 # Input and Weight parameters
@@ -42,7 +41,7 @@ input_prec = 16
 weight_width = 16
 # Change here - Specify the IMA parameters here
 xbar_bits = 2
-num_matrix = 2 # each matrix is 1-fw logical xbar for inference and 1-fw, 1-bw, and 1 delta logical xbar for training. Each logical xbar for inference is 8-fw physical xbar and for training  8-fw, 8-bw and 16-delta physical xbars.
+num_matrix = 6 # each matrix is 1-fw logical xbar for inference and 1-fw, 1-bw, and 1 delta logical xbar for training. Each logical xbar for inference is 8-fw physical xbar and for training  8-fw, 8-bw and 16-delta physical xbars.
 xbar_size = 128
 dac_res = 1
 # ADC configuration
@@ -55,9 +54,9 @@ num_adc = num_adc_per_matrix * num_matrix
 # NOTE: Only taking in account indexes 0 and 2, 1 and 3 are ignored, because ADCs 1 and 3 are assumed t be equal to 0 and 2. 
 adc_res_new = {
                 'matrix_adc_0' : 8,
-                'matrix_adc_1' : 4,
+                'matrix_adc_1' : 8,
                 'matrix_adc_2' : 8,
-                'matrix_adc_3' : 4
+                'matrix_adc_3' : 8
               }
 
 num_ALU = num_matrix*2
@@ -72,7 +71,7 @@ if (training):
 if (inference):
     datamem_off = xbar_size * (num_matrix*2) # each matrix has 2 memory spaces ( 1 input Xbar memory and 1 output Xbar memory) 
 
-phy2log_ratio = num_bits / xbar_bits # ratio of physical to logical xbar #vaulue is 8
+#phy2log_ratio = num_bits / xbar_bits # ratio of physical to logical xbar #vaulue is 8
 lr = 0.25 # learning rate for updates to d-xbar
 
 ## Tile configurable parameters (permissible values for each parameter provided here)
@@ -90,7 +89,7 @@ instrn_width = 48 # bits (op-2, vtile_id-6, send/receive_width-8, target_addr/co
 edram_buswidth = 256 # in bits
 #receive_buffer_depth = 16
 receive_buffer_depth = 150 #set equal to num_tile_max
-receive_buffer_width =  edram_buswidth / num_bits # size of receive buffeer entry (in terms of number of neurons)
+receive_buffer_width =  edram_buswidth / datacfg.num_bits # size of receive buffeer entry (in terms of number of neurons)
 
 # Change here - Specify the Tile parameters here
 num_ima = 8

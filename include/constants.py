@@ -63,6 +63,10 @@ last_stage = 'ex'
 #############################################################################################################
 
 # IMA component latency/power/area dictionary (all values in ns, mw, mm2)
+
+#ReRAM accuracy degradtion. Use ReRAM_read_sigma = 0 for no degradtion
+ReRAM_read_sigma = 0
+
 # XBAR - Models from ISAAC paper
 xbar_lat_dict = {'2': {'32' : 32,   # first indexed by xbar_bits then by xbar_size
                        '64' : 64,

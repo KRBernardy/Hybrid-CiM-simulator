@@ -6,14 +6,49 @@
 import sys
 
 import numpy as np
-import constants as param
-import config as cfg
+import include.constants as param
+import include.config as cfg
+from include.data_config import num_config as datacfg
 import math
 from data_convert import *
 
 
+
+class ReRAM_cell (object):
+    def __init__(self, resolution = cfg.num_, value = 0):
+        self.resolution = resolution
+        self.value = value
+
+        #need more data form param, e.g. read_latency
+        self.read_latency = param.xbar_rd_lat
+
+        #Write latency varies for different resolotion
+        #self.write_latency = param.xbar_wr_lat[resolution]
+
+    def getResolution(self):
+        return self.resolution
+    
+    def getReadLatency(self):
+        return self.read_latency
+    
+    def getWriteLatency(self):
+        return self.write_latency
+    
+    def write(self, value):
+        self.value = value
+        return self.value
+    
+    def read(self):
+        #returns a random value to simulate accuracy
+        return np.random.normal(self.value, param.ReRAM_read_sigma)
+    
+    def getValue(self):
+        #returns the accurate value
+        return self.value
+
+
 class xbar (object):
-    def __init__ (self, xbar_size, xbar_value= 'nil' ):
+    def __init__ (self, xbar_size, bits_per_cell = 2, xbar_value= 'nil' ):
         # define num_accesses for different operations
         # parallel reads (inner-product)
         self.num_access = { '0':0, '90': 0,'80': 0,'70': 0,'60': 0,'50': 0,'40': 0,'30': 0,'20': 0,'10': 0}
@@ -22,6 +57,7 @@ class xbar (object):
         self.num_access_wr = 0 # serial writes
 
         # define latency for various xbar operations
+        # latency for write should vary with bits_per_cell, to be add later
         self.latency_ip = param.xbar_ip_lat
         self.latency_op = param.xbar_op_lat
         self.latency_rd = param.xbar_rd_lat
@@ -37,11 +73,15 @@ class xbar (object):
 
         # xbar output currents are recorded fro analysis of applicable
         self.xb_record = []
+        self.bits_per_cell = bits_per_cell
 
 
     # Records the xbar currents
     def record (self, xb_out):
         self.xb_record.append(xb_out)
+
+    def bitsPerCell(self):
+        return self.bits_per_cell
 
     def get_value(self):
         print(self.xbar_value)
@@ -64,12 +104,20 @@ class xbar (object):
         self.num_access_wr += 1
         self.xbar_value[k][l] = value
 
-    # reads a location on xbar
+    # reads a location on xbar with ReRAM accuracy degradtion
     def read (self, k, l):
         assert (k < cfg.xbar_size), 'row entry exceeds xbar size'
         assert (l < cfg.xbar_size), 'col entry exceeds xbar size'
         self.num_access_rd += 1
-        return self.xbar_value[k][l]
+        return np.random.normal(self.xbar_value[k][l], param.ReRAM_read_sigma)
+
+    # reads a location on xbar, getting the accurate value
+    def read_accurate (self, k, l):
+        assert (k < cfg.xbar_size), 'row entry exceeds xbar size'
+        assert (l < cfg.xbar_size), 'col entry exceeds xbar size'
+        self.num_access_rd += 1
+        return np.random.normal(self.xbar_value[k][l], param.ReRAM_read_sigma)
+    
 
     def getIpLatency (self):
         return self.latency_ip
@@ -83,16 +131,21 @@ class xbar (object):
     def getWrLatency (self):
         return self.latency_wr
 
-    def propagate (self, inp = 'nil'):
+    #input here should be float list, we use float to represent analog values
+    def propagate (self, inp = 'nil', accurate = False):
         self.num_access += 1
         assert (inp != 'nil'), 'propagate needs a non-nil input'
         assert (len(inp) == self.xbar_size), 'xbar input size mismatch'
-        out = np.dot(inp, self.xbar_value)
+        # add noise when reading if didn't ask for acccurate value
+        if accurate:
+            out = np.dot(inp, self.xbar_value)
+        else:
+            noise = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
+            out = np.dot(inp, self.xbar_value + noise)
         self.record(out)
         return out
 
-    # HACK - until propagate doesn't have correct analog functionality
-    def propagate_dummy (self, inp = 'nil', sparsity = 0):
+    def propagate_dummy (self, inp = 'nil', sparsity = 0, accurate = False):
         # data input is list of bit strings (of length dac_res) - fixed point binary
         assert (inp != 'nil'), 'propagate needs a non-nil input'
         assert (len(inp) == self.xbar_size), 'xbar input size mismatch'
@@ -110,26 +163,32 @@ class xbar (object):
             temp_inp = (cfg.num_bits - cfg.dac_res) * '0' + inp[i]
             inp_float[i] = fixed2float(temp_inp, cfg.int_bits, cfg.frac_bits)
         inp_float = np.asarray (inp_float)
-        out_float = np.dot(inp_float, self.xbar_value)
-        
+        # add noise when reading if didn't ask for acccurate value
+        if accurate:
+            out_float = np.dot(inp, self.xbar_value)
+        else:
+            noise = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
+            out_float = np.dot(inp, self.xbar_value + noise)
 
         # record xbar_i if applicable
         if (cfg.xbar_record):
             self.record(out_float)
-
+        '''
         # convert float back to fixed point binary
         out_fixed  = [''] * self.xbar_size
         for i in range(len(out_fixed)):
             out_fixed[i] = float2fixed(out_float[i], cfg.int_bits, cfg.frac_bits)
 
         #return out_fixed
+        '''
+        # we use float to represent analog values
         return out_float
 
-
 # xbar_op class supports both mvm (inner-product) and vvo (outer-product) operations
+# TODO this is used to deal with the delta when training. not modified yet. further investigation on how ReRAM accuracy degradtion needed
 class xbar_op (xbar):
     # add function for outer_product computation
-    def propagate_op_dummy (self, inp1 = 'nil', inp2 = 'nil', lr=1, in1_bit=cfg.dac_res, in2_bit=cfg.xbar_bits):
+    def propagate_op (self, inp1 = 'nil', inp2 = 'nil', lr=1, in1_bit=cfg.dac_res, in2_bit=cfg.xbar_bits):
         # inner-product and outer_product functions should have different energies (and other metrics) - NEEDS UPDATE
         self.num_access['0'] += 1
         # check both data inputs
@@ -248,7 +307,7 @@ class adc (object):
         bin_value = bin(int_value - 1)[2:]
         return ('0'*(num_bits - len(bin_value)) + bin_value)
 
-    def propagate (self, inp):
+    def propagate (self, inp, sparsity = 0):
         self.num_access += 1
         assert (type(inp) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
         num_bits = self.adc_res
@@ -299,12 +358,14 @@ class sampleNhold (object):
     def getLatency (self):
         return self.latency
 
-    # propagate needs to be updated withe xact analog functionaloty if any
+    # propagate is sample
     def propagate (self, inp_list):
-        #self.num_access += 1
+        self.num_access += 1
+        assert (type(inp_list[0]) in [float, np.float32, np.float64]), 'sample&hold input should be analog (float)'
         assert (len(inp_list) == len(self.hold_latch)), 'sample&hold input size mismatch'
-        for i in xrange(len(inp_list)):
-            self.hold_latch[i] = inp_list[i]
+        self.hold_latch = inp_list
+    
+    def read(self):
         return self.hold_latch
 
     def propagate_dummy (self, inp_list):
@@ -395,8 +456,8 @@ class alu (object):
         assert ((type(aluop) == str) and (aluop in self.options.keys())), 'Invalid alu_op'
         assert (type(c) == int or (type(c) == str and len(c) == cfg.num_bits)), 'ALU sna: shift = int/ num_bit str'
         if (type(c) == str):
-            c = bin2int (c, cfg.num_bits)
-        a = fixed2float (a, cfg.int_bits, cfg.frac_bits)
+            c = bin2int (c, datacfg.num_bits)
+        a = fixed2float (a, datacfg.int_bits, datacfg.frac_bits)
         if (b == ''):
             b = 0
         else:
@@ -507,17 +568,18 @@ class memory (object):
         assert (self.addr_start <= addr <= self.addr_end), 'addr exceeds the memory bounds'
         #print 'length of data ' + str(len(data))
         #assert ((type(data) ==  str) and (len(data) == cfg.data_width)), 'data should be a string with mem_width bits'
-	assert ((type(data) == str) and ((type_t == 'data')) or (type_t == 'addr')) # UPDATE - Pointer/address for LD/ST written by previous SET instrn. can be larger than data_width
-	if (type_t == 'data'):
-	    try: 
-		assert (len(data) == cfg.data_width)
-		#print("I am here!!")
-	    except AssertionError:
-		print("Warning: Data width received is not-coherent, NEEDS DEBUGGING")
-		data = data[0:16]
-	else:
-	    assert (len(data) == cfg.addr_width) # Specification for pointer (or addres type data)
+        assert ((type(data) == str) and ((type_t == 'data')) or (type_t == 'addr')) # UPDATE - Pointer/address for LD/ST written by previous SET instrn. can be larger than data_width
+        if (type_t == 'data'):
+            try: 
+                assert (len(data) == cfg.data_width)
+		        #print("I am here!!")
+            except AssertionError:
+                print("Warning: Data width received is not-coherent, NEEDS DEBUGGING")
+            data = data[0:16]
+        else:
+            assert (len(data) == cfg.addr_width) # Specification for pointer (or addres type data)
         self.memfile[addr - self.addr_start] = data
+            
 
     def reset (self):
         self.num_access += 1
