@@ -23,7 +23,7 @@ class num_config:
 
         self.int_bits = int_bits
         assert self.int_bits <= self.num_bits, 'storage config invalid: int_bits is more than total storaged bits'
-        frac_bits = self.num_bits - self.int_bits
+        self.frac_bits = self.num_bits - self.int_bits
 
 
 

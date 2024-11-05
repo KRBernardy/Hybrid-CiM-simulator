@@ -8,7 +8,7 @@ import sys
 import numpy as np
 import include.constants as param
 import include.config as cfg
-from include.data_config import num_config as datacfg
+from include.data_config import datacfg
 import math
 from data_convert import *
 
@@ -98,8 +98,11 @@ class xbar (object):
         return self.latency_wr
 
     #input here should be float list, we use float to represent analog values
-    def propagate (self, inp = 'nil', accurate = False):
-        self.num_access += 1
+    def propagate (self, inp = 'nil', sparsity = 0, accurate = False):
+        if cfg.MVMU_ver == "Analog":
+            self.num_access['0'] += 1
+        else:
+            self.num_access[str(sparsity)] +=1
         assert (inp != 'nil'), 'propagate needs a non-nil input'
         assert (len(inp) == self.xbar_size), 'xbar input size mismatch'
         # add noise when reading if didn't ask for acccurate value
@@ -274,7 +277,32 @@ class adc (object):
         return ('0'*(num_bits - len(bin_value)) + bin_value)
 
     def propagate (self, inp, sparsity = 0):
-        self.num_access += 1
+        if sparsity<50:
+            self.num_access['n'] += 1
+            self.adc_res = cfg.adc_res
+        elif sparsity<75:
+            self.num_access['n/2'] += 1
+            self.adc_res = cfg.adc_res-1
+        elif sparsity<87.5:
+            self.num_access['n/4'] += 1
+            self.adc_res = cfg.adc_res-2
+        elif sparsity<93.75:
+            self.num_access['n/8'] += 1
+            self.adc_res = cfg.adc_res-3
+        elif sparsity<96.875:
+            self.num_access['n/16'] += 1
+            self.adc_res = cfg.adc_res-4
+        elif sparsity<98.4375:
+            self.num_access['n/32'] += 1
+            self.adc_res = cfg.adc_res-5
+        elif sparsity<99.21875:
+            self.num_access['n/64'] += 1
+            self.adc_res = cfg.adc_res-6
+        else:
+            self.num_access['n/128'] += 1
+            self.adc_res = cfg.adc_res-7
+        if(self.adc_res<=0):
+            self.adc_res = 1
         assert (type(inp) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
         num_bits = self.adc_res
         return self.real2bin (inp, num_bits)
@@ -429,11 +457,11 @@ class alu (object):
         else:
             if (aluop == 'sna'): # shift left in fixed point binary
                 b = b[c:] + '0' * c
-            b = fixed2float (b, cfg.int_bits, cfg.frac_bits)
+            b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
         out = self.options[aluop] (a, b)
         # overflow needs to be detected while conversion
         ovf = 0
-        out = float2fixed (out, cfg.int_bits, cfg.frac_bits)
+        out = float2fixed (out, datacfg.int_bits, datacfg.frac_bits)
         return [out, ovf]
 
     # for functionality define a propagate float for use in inter-xbar shift-and-adds

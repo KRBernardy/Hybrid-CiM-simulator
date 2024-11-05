@@ -7,10 +7,10 @@ import sys, json
 import numpy as np
 import math
 import include.config as cfg
-from include.data_config import num_config as datacfg
+from include.data_config import datacfg
 #import include.configTest as cfg
 import include.constants as param
-import constants_digital as digi_param
+import include.constants_digital as digi_param
 import src.ima_modules as imod
 
 from data_convert import *
@@ -741,12 +741,14 @@ class ima (object):
                                 # write wt slices to f and b xbar
                                 # captures precision loss, as values read from 16 xbars (32-bits) are converted to 16-bits
                                 wt_new_fixed = float2fixed (wt_new_float, datacfg.int_bits, datacfg.frac_bits)
-                                for m in range (num_xbF):
+                                for m in range (num_xbF):               
+                                    if (m == 0):
+                                        val = wt_new_fixed[-1 * datacfg.storage_bit(m + 1):]
+                                    else:
+                                        val = wt_new_fixed[-1 * datacfg.storage_bit(m + 1): -1 * datacfg.storage_bit(m + 1) + int(datacfg.storage_config[m])]
                                     # augment sign extension (used in MSB xbar only)
                                     if (m == (num_xbF - 1)):
                                         val = (datacfg.num_bits - datacfg.storage_bit[m])*val[0] + val[0:]
-                                    else:
-                                        val = wt_new_fixed[-1 * datacfg.storage_bit(m + 1): -1 * datacfg.storage_bit(m + 1) + int(datacfg.storage_config[m])]
                                     val_float = fixed2float(val, datacfg.int_bits, datacfg.frac_bits) # xbar_value in xbar stores float values
                                     self.matrix_list[mat_id]['f'][m].write(k, l, val_float)
                                     self.matrix_list[mat_id]['b'][m].write(k, l, val_float)

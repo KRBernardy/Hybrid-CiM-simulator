@@ -10,7 +10,7 @@ from src.data_convert import *
 
 # Define nstruction prototypes
 # generate load prototype - load data from edram to (datamem/xbinmem)
-phy2log_ratio = cfg.num_bits/cfg.xbar_bits
+#phy2log_ratio = cfg.num_bits/cfg.xbar_bits
 
 def i_load (d1, r1, load_width = 1, vec = 1):
     assert (load_width <= (cfg.edram_buswidth/cfg.data_width)), 'Load width must be smaller than \

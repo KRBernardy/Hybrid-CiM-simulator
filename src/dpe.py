@@ -48,6 +48,7 @@ import numpy as np
 
 import argparse
 import config as cfg
+from data_config import datacfg
 import constants
 import ima_modules
 import ima
@@ -142,7 +143,7 @@ class DPE:
         inp = np.load(inp_filename, allow_pickle=True).item()
         print ('length of input data:', len(inp['data']))
         for i in range(len(inp['data'])):
-            data = float2fixed(inp['data'][i], cfg.int_bits, cfg.frac_bits)
+            data = float2fixed(inp['data'][i], datacfg.int_bits, datacfg.frac_bits)
             node_dut.tile_list[inp_tileId].edram_controller.mem.memfile[i] = data
             node_dut.tile_list[inp_tileId].edram_controller.counter[i] = int(
                 inp['counter'][i])

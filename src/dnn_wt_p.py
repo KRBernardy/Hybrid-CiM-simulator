@@ -8,6 +8,7 @@ sys.path.insert(0, include_dir)
 
 
 import config as cfg
+from data_config import datacfg
 
 class dnn_wt:
 
@@ -19,7 +20,7 @@ class dnn_wt:
             for j in range(cfg.num_ima):
                 print ('Programming ima no: ', j)
                 for k in range(cfg.num_matrix):
-                    for l in range(cfg.phy2log_ratio):
+                    for l in range(datacfg.ReRAM_xbar_num):
                         wt_filename = instrnpath + 'weights/tile' + str(i) + '/core'+str(j)+\
                                 '/mat'+str(k)+'-phy_xbar'+str(l)+'.npy'
                         if (os.path.exists(wt_filename)):  # check if weights for the xbar exist
