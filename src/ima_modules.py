@@ -13,40 +13,6 @@ import math
 from data_convert import *
 
 
-
-class ReRAM_cell (object):
-    def __init__(self, resolution = cfg.num_, value = 0):
-        self.resolution = resolution
-        self.value = value
-
-        #need more data form param, e.g. read_latency
-        self.read_latency = param.xbar_rd_lat
-
-        #Write latency varies for different resolotion
-        #self.write_latency = param.xbar_wr_lat[resolution]
-
-    def getResolution(self):
-        return self.resolution
-    
-    def getReadLatency(self):
-        return self.read_latency
-    
-    def getWriteLatency(self):
-        return self.write_latency
-    
-    def write(self, value):
-        self.value = value
-        return self.value
-    
-    def read(self):
-        #returns a random value to simulate accuracy
-        return np.random.normal(self.value, param.ReRAM_read_sigma)
-    
-    def getValue(self):
-        #returns the accurate value
-        return self.value
-
-
 class xbar (object):
     def __init__ (self, xbar_size, bits_per_cell = 2, xbar_value= 'nil' ):
         # define num_accesses for different operations
