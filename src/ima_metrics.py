@@ -16,7 +16,7 @@ def compute_area (): #in mm2
         area += (cfg.num_matrix*2) * param.sna_area # sna for one each f/b xbars
         area += cfg.num_adc * param.adc_area # adc
         area += (cfg.num_matrix*3) * param.xbar_outMem_area # xbar_outMem (1 OR for 8 xbars - 16 bit weights, 2 bit xbars)
-        area += (cfg.num_matrix*4) * cfg.phy2log_ratio * param.xbar_area # d-xbar has 2X xbars than f/b
+        area += (cfg.num_matrix*4) * datacfg.ReRAM_xbar_num * param.xbar_area # d-xbar has 2X xbars than f/b
     else:
         area += (cfg.num_matrix*2) * param.xbar_area # d-xbar are not needed in Digital MVMUs only f and b are there
     area += (cfg.num_matrix*3) * param.xbar_inMem_area # xbar_inMem one each for f/b/d xbars

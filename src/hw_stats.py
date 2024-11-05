@@ -2,6 +2,7 @@
 # Write to file
 import sys
 import config as cfg
+from data_config import datacfg
 import constants as param
 import node_metrics
 import tile_metrics
@@ -107,11 +108,11 @@ def get_hw_stats (fid, node_dut, cycle):
             sum_num_cycle_ima += node_dut.tile_list[i].ima_list[j].cycle_count # used for leakage energy of imas
 
             mvmu_type = ['f', 'b', 'd']
-            for k in range (cfg.num_matrix):
+            for k in range (datacfg.ReRAM_xbar_num):
                 for mvmu_t in mvmu_type:
                     # Xbar accesses
                     if cfg.MVMU_ver == "Analog":
-                        for m in range(cfg.phy2log_ratio):
+                        for m in range(datacfg.ReRAM_xbar_num):
                             if (mvmu_t == 'd'):
                                 hw_comp_access['xbar_op'] += node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].num_access['0']
                             elif (mvmu_t == 'b'):
@@ -153,7 +154,7 @@ def get_hw_stats (fid, node_dut, cycle):
                             hw_comp_access['dac'] += node_dut.tile_list[i].ima_list[j].dacArray_list[k][dac_t].dac_list[l].num_access
 
             if cfg.MVMU_ver == "Analog":
-                for k in range (2*cfg.num_matrix*cfg.phy2log_ratio):
+                for k in range (2*cfg.num_matrix*datacfg.ReRAM_xbar_num):
                     hw_comp_access['snh'] += (node_dut.tile_list[i].ima_list[j].snh_list[k].num_access * cfg.xbar_size) # each snh is
                     # basically an array of multiple snhs (individual power in constants file must be for one discerete snh)
 
