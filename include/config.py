@@ -2,7 +2,7 @@
 ## All user specified parameters are provided by this file only
 
 
-from data_config import num_config as datacfg
+from data_config import datacfg
 
 ## Debug - 0 (1): dpe simulation will (won't) produce ima/tile traces while simulating
 cycles_max = 5000000 # Put both these to very large numbers (when design is bug-free)!
