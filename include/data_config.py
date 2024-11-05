@@ -25,4 +25,12 @@ class num_config:
         assert self.int_bits <= self.num_bits, 'storage config invalid: int_bits is more than total storaged bits'
         frac_bits = self.num_bits - self.int_bits
 
+
+
+# Change here to use different data config. 
+# the first param indicates how data is storaged.
+# the second param indicates how many int_bits are included.
+# e.g. ['2', '2', '2', '2', '2', '1', '1', 's', 's', 's', 's'], 12: 
+# a 16 bit parameter, 10 lower bits storaged in 5 2-bit ReRAM MLCs, 2 middle bits storaged in 2 ReRAM SLCs, 4 higher bits storaged in 4 SRAMs
+# 12 int bit, 4 frac bit
 datacfg = num_config(['2', '2', '2', '2', '2', '2', '2', '2'], 12)
