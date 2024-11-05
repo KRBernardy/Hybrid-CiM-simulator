@@ -130,7 +130,7 @@ class xbar (object):
         for i in range(len(inp)):
             # extend data to num_bits for computation (sign extended)
             temp_inp = (cfg.num_bits - cfg.dac_res) * '0' + inp[i]
-            inp_float[i] = fixed2float(temp_inp, cfg.int_bits, cfg.frac_bits)
+            inp_float[i] = fixed2float(temp_inp, datacfg.int_bits, datacfg.frac_bits)
         inp_float = np.asarray (inp_float)
         # add noise when reading if didn't ask for acccurate value
         if accurate:
@@ -174,8 +174,8 @@ class xbar_op (xbar):
             # extend data to num_bits for computation (sign extended)
             temp_inp1 = (cfg.num_bits - in1_bit) * '0' + inp1[i]
             temp_inp2 = (cfg.num_bits - in2_bit) * '0' + inp2[i]
-            inp1_float[i] = fixed2float(temp_inp1, cfg.int_bits, cfg.frac_bits)
-            inp2_float[i] = fixed2float(temp_inp2, cfg.int_bits, cfg.frac_bits)
+            inp1_float[i] = fixed2float(temp_inp1, datacfg.int_bits, datacfg.frac_bits)
+            inp2_float[i] = fixed2float(temp_inp2, datacfg.int_bits, datacfg.frac_bits)
         inp1_float = np.asarray (inp1_float)
         inp2_float = np.asarray (inp2_float)
 
