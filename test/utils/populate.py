@@ -54,16 +54,17 @@ for i in os.listdir(THIS_PATH):
                     for k in range(datacfg.ReRAM_xbar_num):
                         if (k==0):
                             val = temp_val[-1 * datacfg.storage_bit[k + 1]:]
+                        elif (k == datacfg.ReRAM_xbar_num - 1):
+                            val = temp_val[:int(datacfg.storage_config[k])]
+                            # augment sign extension (used in MSB xbar only)
+                            val = (datacfg.num_bits - int(datacfg.storage_config[k]))*val[0] + val[0:]
                         else:
                             val = temp_val[-1 * datacfg.storage_bit[k + 1]: -1 * datacfg.storage_bit[k + 1] + int(datacfg.storage_config[k])]
-            # augment sign extension (used in MSB xbar only)
-                        if (k == (len(phy_xbar)-1)):
-                            val = (datacfg.num_bits - datacfg.storage_bit[k])*val[0] + val[0:]
+
                         phy_xbar[k][i][j] = fixed2float(val, datacfg.int_bits, datacfg.frac_bits)
 ## save log_xbar and phy_xbar to disc
             np.save (wt_path+'log_xbar'+str(mat_id), log_xbar)
             for k in range (len(phy_xbar)):
                 np.save (wt_path+'mat'+str(mat_id)+'-phy_xbar'+str(k), phy_xbar[k])
-
 
 

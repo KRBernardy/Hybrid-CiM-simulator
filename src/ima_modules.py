@@ -448,7 +448,7 @@ class alu (object):
 
     def propagate (self, a, b, aluop, c = 0): # c can be shift operand for sna operation (add others later)
         assert ((type(aluop) == str) and (aluop in self.options.keys())), 'Invalid alu_op'
-        assert (type(c) == int or (type(c) == str and len(c) == cfg.num_bits)), 'ALU sna: shift = int/ num_bit str'
+        assert (type(c) == int or (type(c) == str and len(c) == datacfg.num_bits)), 'ALU sna: shift = int/ num_bit str'
         if (type(c) == str):
             c = bin2int (c, datacfg.num_bits)
         a = fixed2float (a, datacfg.int_bits, datacfg.frac_bits)
@@ -456,7 +456,7 @@ class alu (object):
             b = 0
         else:
             if (aluop == 'sna'): # shift left in fixed point binary
-                b = b[c:] + '0' * c
+                b = b + '0' * c
             b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
         out = self.options[aluop] (a, b)
         # overflow needs to be detected while conversion

@@ -744,11 +744,13 @@ class ima (object):
                                 for m in range (num_xbF):               
                                     if (m == 0):
                                         val = wt_new_fixed[-1 * datacfg.storage_bit(m + 1):]
+                                    elif m == (num_xbF - 1):
+                                        val = wt_new_fixed[:int(datacfg.storage_config[m])]
+                                        # augment sign extension (used in MSB xbar only)
+                                        val = (datacfg.num_bits - datacfg.storage_bit[m])*val[0] + val[0:]
                                     else:
                                         val = wt_new_fixed[-1 * datacfg.storage_bit(m + 1): -1 * datacfg.storage_bit(m + 1) + int(datacfg.storage_config[m])]
-                                    # augment sign extension (used in MSB xbar only)
-                                    if (m == (num_xbF - 1)):
-                                        val = (datacfg.num_bits - datacfg.storage_bit[m])*val[0] + val[0:]
+                                    
                                     val_float = fixed2float(val, datacfg.int_bits, datacfg.frac_bits) # xbar_value in xbar stores float values
                                     self.matrix_list[mat_id]['f'][m].write(k, l, val_float)
                                     self.matrix_list[mat_id]['b'][m].write(k, l, val_float)
