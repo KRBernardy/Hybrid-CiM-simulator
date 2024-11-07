@@ -5,10 +5,11 @@
 # 4. binary (2s complement) to inetger [bit-string to int]
 import numpy as np
 
-def bin2int (binary_string, bits):
+def bin2int (binary_string, bits, compliment = True):
     val = int (binary_string,2)
-    if (val & (1 << (bits - 1))) != 0: # if sign bit is set e.g., 8bit: 128-255
-        val = val - (1 << bits)        # compute negative value
+    if compliment:                         # if the given string is in twos compliment, do the sign computation
+        if (val & (1 << (bits - 1))) != 0: # if sign bit is set e.g., 8bit: 128-255
+            val = val - (1 << bits)        # compute negative value
     return val
 
 def int2bin (int_data, bits):
@@ -20,8 +21,8 @@ def float2fixed (float_data, int_bits, frac_bits):
     temp = int(round (temp))
     return int2bin (temp, (int_bits+frac_bits))
 
-def fixed2float (binary_string, int_bits, frac_bits):
-    temp = bin2int (binary_string, (int_bits + frac_bits))
+def fixed2float (binary_string, int_bits, frac_bits, compliment = True):
+    temp = bin2int (binary_string, (int_bits + frac_bits), compliment)
     return float(temp) / (2**frac_bits)
 
 # defining float (2d numpy float array) <-> fixed (2d list of strings) conversion
