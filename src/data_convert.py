@@ -7,13 +7,13 @@ import numpy as np
 import include.constants as param
 
 
-# this function is used to convert bin str to proper ReRAM resistance
+# this function is used to convert bin str to proper ReRAM conductance
 
-def bin2resistance(binary_string, bits):
+def bin2conductance(binary_string, bits):
     assert (len(binary_string) == bits), 'length of input binary string should be same with bits'
     level = int (binary_string, 2)
-    step = float((param.xbar_resistance_max - param.xbar_resistance_min)) / bits
-    return param.xbar_resistance_min + (level * step)
+    step = float((param.xbar_conductance_max - param.xbar_conductance_min)) / bits
+    return param.xbar_conductance_min + (level * step)
 
 
 def bin2int (binary_string, bits, compliment = True):
