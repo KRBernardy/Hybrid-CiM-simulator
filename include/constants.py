@@ -12,8 +12,8 @@ infinity = 100000
 # IMA - folliwng parameters are not used currently, will be used when analog functionality is implemented
 cycle_time = 1 # in nanoseconds (1ns)
 vdd = 0.9
-xbar_out_min = -10e-10
-xbar_out_max = 1 # think about this - ???
+xbar_resistance_min = -10e-10
+xbar_resistance_max = 1 # think about this - ???
 
 #############################################################################################################
 ## Define commonly used data structures
