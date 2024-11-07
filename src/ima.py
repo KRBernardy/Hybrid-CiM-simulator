@@ -115,10 +115,12 @@ class ima (object):
             self.adc_list.append(temp_adc)
 
         # Instantiate sample and hold
-        self.snh_list = []
+        self.snh_list_pos = []
+        self.snh_list_neg = []
         for i in xrange (2 * cfg.num_matrix * datacfg.ReRAM_xbar_num):
             temp_snh = imod.sampleNhold (cfg.xbar_size)
-            self.snh_list.append(temp_snh)
+            self.snh_list_pos.append(temp_snh)
+            self.snh_list_neg.append(temp_snh)
 
         # Instatiate mux (num_mux depends on num_xbars and num_adcs)
         # The mux design (described below) will vary (xbar_size = 64):
@@ -626,42 +628,46 @@ class ima (object):
                         out_dac = self.dacArray_list[mat_id][key].propagate(out_xb_inMem) #pass through
 
                         # Do MVM in each xbar (weight is distributed)
-                        out_xbar = [[] for x in range(datacfg.ReRAM_xbar_num)]
-                        out_snh = [[] for x in range(datacfg.ReRAM_xbar_num)]
+                        out_xbar_pos = [[] for x in range(datacfg.ReRAM_xbar_num)]
+                        out_xbar_neg = [[] for x in range(datacfg.ReRAM_xbar_num)]
+                        out_snh_pos = [[] for x in range(datacfg.ReRAM_xbar_num)]
+                        out_snh_neg = [[] for x in range(datacfg.ReRAM_xbar_num)]
                         for m in range (datacfg.ReRAM_xbar_num):
                             # compute dot-product
-                            out_xbar[m] = self.matrix_list[mat_id][key][m].propagate(out_dac, sparsity)
+                            [out_xbar_pos[m], out_xbar_neg[m]] = self.matrix_list[mat_id][key][m].propagate(out_dac, sparsity)
                             # do sampling
-                            self.snh_list[mat_id * datacfg.ReRAM_xbar_num + m].propagate(out_xbar[m])
+                            self.snh_list_pos[mat_id * datacfg.ReRAM_xbar_num + m].propagate(out_xbar_pos[m])
+                            self.snh_list_neg[mat_id * datacfg.ReRAM_xbar_num + m].propagate(out_xbar_neg[m])
                             # reads out from sample&hold 
                             # NOTE: theoretically this should be done in the next loop. to minimize the change and simplify the code I put it here
-                            out_snh[m] = self.snh_list[mat_id * datacfg.ReRAM_xbar_num + m].read()
+                            out_snh_pos[m] = self.snh_list_pos[mat_id * datacfg.ReRAM_xbar_num + m].read()
+                            out_snh_neg[m] = self.snh_list_neg[mat_id * datacfg.ReRAM_xbar_num + m].read()
 
                         # each of the xbar produce shifted bits of output (weight bits have been distributed)
                         for j in xrange (cfg.xbar_size): # this 'for' across xbar outs to adc happens via mux
-                            out_sna = '0' * cfg.data_width # a zero for first sna
+                            out_sna = 0 # a zero for first sna
                             for m in range (datacfg.ReRAM_xbar_num):
                                 # convert from analog to digital
                                 adc_id = (mat_id * datacfg.ReRAM_xbar_num + m) % cfg.num_adc
-                                out_mux1 = self.mux1_list[mat_id].propagate(out_snh[m], j) # i is the ith xbar
+                                out_mux1 = self.mux1_list[mat_id].propagate(out_snh_pos[m], j) # i is the ith xbar
                                 out_mux2 = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux1) #dummy for directly getting input out, used to simplify the code
-                                out_adc = self.adc_list[adc_id].propagate(out_mux2, sparsity_adc) # gets jth value in this mth xbar
+                                out_adc_pos = self.adc_list[adc_id].propagate(out_mux2, sparsity_adc) # gets jth value in this mth xbar
+                                out_mux1 = self.mux1_list[mat_id].propagate(out_snh_neg[m], j) # i is the ith xbar
+                                out_mux2 = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux1) #dummy for directly getting input out, used to simplify the code
+                                out_adc_neg = self.adc_list[adc_id].propagate(out_mux2, sparsity_adc) # gets jth value in this mth xbar
 
                                 # shift and add outputs from difefrent wt_bits
-                                alu_op = 'sna'
                                 #[out_sna, ovf] = self.alu_list[0].propagate (out_sna, out_adc, alu_op, \
                                 #        m * cfg.xbar_bits)
-                                [out_sna, ovf] = self.alu_list[0].propagate_float (out_sna, out_adc, alu_op, \
-                                        datacfg.storage_bit[m])
-                                # NOTE overflow not fixed in here
+                                # NOTE here to deal with overflow, we use propagate_float. this should be fixed later
+                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc_pos, 'sna', datacfg.storage_bit[m], return_type = 'float')
+                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc_neg, 'sns', datacfg.storage_bit[m], return_type = 'float')
 
                             
                             # read from xbar's output register
                             out_xb_outMem = self.xb_outMem_list[mat_id][key].read (j)
                             # shift and add - make a dedicated sna unit -- PENDING
-                            alu_op = 'sna'
-                            # modify (len(out_adc) to adc_res) when ADC functionality is implemented
-                            [out_sna, ovf] = self.alu_list[0].propagate (out_xb_outMem, out_sna, alu_op, k * cfg.dac_res)
+                            [out_sna, ovf] = self.alu_list[0].propagate(out_xb_outMem, out_sna, 'sna', k * cfg.dac_res)
                             if (cfg.debug and ovf):
                                 fid.write ('IMA: ' + str(self.ima_id) + ' ALU Overflow Exception ' +\
                                         self.de_aluop + ' allowed to run')

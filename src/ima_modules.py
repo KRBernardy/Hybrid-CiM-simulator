@@ -32,10 +32,16 @@ class xbar (object):
         # xbar_value is the weights meant for one crossbar
         self.xbar_size = xbar_size
         #self.xbar_value = np.random.randn(xbar_size, xbar_size)
-        self.xbar_value = np.zeros((xbar_size, xbar_size))
+        self.xbar_value_pos = np.zeros((xbar_size, xbar_size))
+        self.xbar_value_neg = np.zeros((xbar_size, xbar_size))
         # unprogrammed xbar contains zeros
         if (xbar_value != 'nil'):
-            self.xbar_value = xbar_value
+            for i in range(xbar_size):
+                for j in range(xbar_size):
+                    if xbar_value[i][j] > 0:
+                        self.xbar_value_pos[i][j] = xbar_value[i][j]
+                    else:
+                        self.xbar_value_neg[i][j] = xbar_value[i][j]
 
         # xbar output currents are recorded fro analysis of applicable
         self.xb_record = []
@@ -50,7 +56,8 @@ class xbar (object):
         return self.bits_per_cell
 
     def get_value(self):
-        print(self.xbar_value)
+        print(self.xbar_value_pos)
+        print(self.xbar_value_neg)
 
     # programs the entire xbar during configuration phase
     def program (self, xbar_value = ''):
@@ -60,7 +67,12 @@ class xbar (object):
         assert (val_size[0] <= size_max and val_size[1] <= size_max), \
                     'Xbar values format should be a numpy array of the xbar dimensions'
         #self.xbar_value[0:val_size[0], 0:val_size[1]] = xbar_value.copy ()
-        self.xbar_value = xbar_value.copy()
+        for i in range(self.xbar_size):
+                for j in range(self.xbar_size):
+                    if xbar_value[i][j] > 0:
+                        self.xbar_value_pos[i][j] = xbar_value[i][j]
+                    else:
+                        self.xbar_value_neg[i][j] = xbar_value[i][j]
 
     # writes to a location on xbar
     def write (self, k, l, value):
@@ -68,21 +80,26 @@ class xbar (object):
         assert (l < cfg.xbar_size), 'col entry exceeds xbar size'
         assert (type(value) == float), 'value written to xbar should be float'
         self.num_access_wr += 1
-        self.xbar_value[k][l] = value
+        if (value > 0):
+            self.xbar_value_pos[k][l] = value
+            self.xbar_value_neg[k][l] = 0
+        else:
+            self.xbar_value_pos[k][l] = 0
+            self.xbar_value_neg[k][l] = value
 
     # reads a location on xbar with ReRAM accuracy degradtion
-    def read (self, k, l):
+    def read (self, k, l, accurate = False):
         assert (k < cfg.xbar_size), 'row entry exceeds xbar size'
         assert (l < cfg.xbar_size), 'col entry exceeds xbar size'
         self.num_access_rd += 1
-        return np.random.normal(self.xbar_value[k][l], param.ReRAM_read_sigma)
-
-    # reads a location on xbar, getting the accurate value
-    def read_accurate (self, k, l):
-        assert (k < cfg.xbar_size), 'row entry exceeds xbar size'
-        assert (l < cfg.xbar_size), 'col entry exceeds xbar size'
-        self.num_access_rd += 1
-        return np.random.normal(self.xbar_value[k][l], param.ReRAM_read_sigma)
+        if self.xbar_value_pos[k][l] > 0:
+            value = self.xbar_value_pos[k][l]
+        else:
+            value = -1 * self.xbar_value_neg[k][l]
+        if (accurate == False):
+            return np.random.normal(value, param.ReRAM_read_sigma)
+        else:
+            return value
     
 
     def getIpLatency (self):
@@ -107,12 +124,15 @@ class xbar (object):
         assert (len(inp) == self.xbar_size), 'xbar input size mismatch'
         # add noise when reading if didn't ask for acccurate value
         if accurate:
-            out = np.dot(inp, self.xbar_value)
+            out_pos = np.dot(inp, self.xbar_value_pos)
+            out_neg = np.dot(inp, self.xbar_value_neg)
         else:
-            noise = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
-            out = np.dot(inp, self.xbar_value + noise)
-        self.record(out)
-        return out
+            noise_pos = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
+            out_pos = np.dot(inp, self.xbar_value_pos + noise_pos)
+            noise_neg = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
+            out_neg = np.dot(inp, self.xbar_value_neg + noise_neg)
+        self.record([out_pos, out_neg])
+        return [out_pos, out_neg]
 
     def propagate_dummy (self, inp = 'nil', sparsity = 0, accurate = False):
         # data input is list of bit strings (of length dac_res) - fixed point binary
@@ -271,11 +291,15 @@ class adc (object):
 
     def real2bin (self, inp, num_bits):
         num_levels = 2**num_bits
-        step = float((param.xbar_out_max - param.xbar_out_min)) / num_levels
-        int_value = int(np.ceil((inp - param.xbar_out_min) / float(step)))
-        bin_value = bin(int_value - 1)[2:]
+        max_current = param.vdd * param.xbar_conductance_max * cfg.xbar_size
+        min_current = 0
+        step = float(max_current - min_current) / num_levels
+        int_value = int(np.ceil((inp - min_current) / float(step)))
+        bin_value = bin(int_value)[2:]
         return ('0'*(num_bits - len(bin_value)) + bin_value)
 
+    # Here we allow the adc to deal with negative inputs
+    # in real circult it should calculate twice, first time for all positive value
     def propagate (self, inp, sparsity = 0):
         if sparsity<50:
             self.num_access['n'] += 1
@@ -403,6 +427,7 @@ class alu (object):
         self.num_access_mul = 0
         self.num_access_act = 0
         self.num_access_sna = 0
+        self.num_access_sns = 0
         self.num_access_other = 0
 
         # define latency
@@ -418,6 +443,9 @@ class alu (object):
         def shift_add (a, b):
             self.num_access_sna += 1
             return (a + b) # does add, b is already shifted
+        def shift_sub (a, b):
+            self.num_access_sns += 1
+            return (a - b) # does subtract, b is already shifted
         def multiply (a, b):
             self.num_access_mul += 1
             return (a * b)
@@ -440,28 +468,40 @@ class alu (object):
             self.num_access_other += 1
             return max (a,b)
 
-        self.options = {'add':add, 'sub':sub, 'sna':shift_add, 'mul':multiply,\
+        self.options = {'add':add, 'sub':sub, 'sna':shift_add, 'sns':shift_sub, 'mul':multiply,\
                 'sig':sigmoid, 'tanh':tanh, 'relu':relu, 'max': max_val}
 
     def getLatency (self):
         return self.latency
 
-    def propagate (self, a, b, aluop, c = 0): # c can be shift operand for sna operation (add others later)
+    def propagate (self, a, b, aluop, c = 0, return_type = 'fixed'): # c can be shift operand for sna operation (add others later)
         assert ((type(aluop) == str) and (aluop in self.options.keys())), 'Invalid alu_op'
         assert (type(c) == int or (type(c) == str and len(c) == datacfg.num_bits)), 'ALU sna: shift = int/ num_bit str'
+        assert (return_type == 'fixed' or return_type == 'float'), "return_type can only be 'fixed' or 'float'"
         if (type(c) == str):
             c = bin2int (c, datacfg.num_bits)
-        a = fixed2float (a, datacfg.int_bits, datacfg.frac_bits)
-        if (b == ''):
-            b = 0
+        if type(a) == str:
+            a = fixed2float (a, datacfg.int_bits, datacfg.frac_bits)
+        if (aluop == 'sna' or aluop == 'sns'): # shift left in fixed point binary
+            if type(b) == str:
+                if (b == ''):
+                    b = 0
+                else:
+                    b = b + '0' * c
+                    b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
+            else:
+                b = b * (2 ** c)
         else:
-            if (aluop == 'sna'): # shift left in fixed point binary
-                b = b + '0' * c
-            b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
+            if type(b) == str: # shift left in fixed point binary
+                if b == '':
+                    b = 0
+                else:
+                    b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
         out = self.options[aluop] (a, b)
         # overflow needs to be detected while conversion
         ovf = 0
-        out = float2fixed (out, datacfg.int_bits, datacfg.frac_bits)
+        if (return_type == 'fixed'):
+            out = float2fixed (out, datacfg.int_bits, datacfg.frac_bits)
         return [out, ovf]
 
     # for functionality define a propagate float for use in inter-xbar shift-and-adds
@@ -473,11 +513,13 @@ class alu (object):
         assert (type(c) == int or (type(c) == str and len(c) == cfg.num_bits)), 'ALU sna: shift = int/ num_bit str'
         if (type(c) == str):
             c = bin2int (c, cfg.num_bits)
+        a = fixed2float (a, datacfg.int_bits, datacfg.frac_bits)
         if (b == ''):
             b = 0
         else:
-            if (aluop == 'sna'): # shift left - multiply by power of 2
-                b = b * (2**c)
+            if (aluop == 'sna' or aluop == 'sns'): # shift left in fixed point binary
+                b = b + '0' * c
+            b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
         out = self.options[aluop] (a, b)
         # overflow needs to be detected while conversion
         ovf = 0
