@@ -220,10 +220,10 @@ class ima (object):
                 wt_new = 0.0
                 for m in datacfg.ReRAM_xbar_num:
                     if key in ['f', 'd']:
-                        wt_new += self.matrix_list[mat_id][key][m].read(k,l) * (2 ** (datacfg.storage_bit[m] - datacfg.frac_bits)) # left shift
+                        wt_new += self.matrix_list[mat_id][key][m].read(k,l) * (2 ** (datacfg.storaged_bit[m] - datacfg.frac_bits)) # left shift
                     else:
-                        wt_new += self.matrix_list[mat_id][key][2 * m].read(k,l) * (2 ** (2 * datacfg.storage_bit[m] - datacfg.frac_bits)) # left shift
-                        wt_new += self.matrix_list[mat_id][key][2 * m + 1].read(k,l) * (2 ** (2 * datacfg.storage_bit[m] + datacfg.storage_config[m] - datacfg.frac_bits)) # left shift
+                        wt_new += self.matrix_list[mat_id][key][2 * m].read(k,l) * (2 ** (2 * datacfg.storaged_bit[m] - datacfg.frac_bits)) # left shift
+                        wt_new += self.matrix_list[mat_id][key][2 * m + 1].read(k,l) * (2 ** (2 * datacfg.storaged_bit[m] + datacfg.storage_config[m] - datacfg.frac_bits)) # left shift
                 matrix[k][l] = wt_new
         return matrix
 
@@ -651,17 +651,17 @@ class ima (object):
                                 adc_id = (mat_id * datacfg.ReRAM_xbar_num + m) % cfg.num_adc
                                 out_mux1 = self.mux1_list[mat_id].propagate(out_snh_pos[m], j) # i is the ith xbar
                                 out_mux2 = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux1) #dummy for directly getting input out, used to simplify the code
-                                out_adc_pos = self.adc_list[adc_id].propagate(out_mux2, sparsity_adc) # gets jth value in this mth xbar
+                                out_adc_pos = self.adc_list[adc_id].propagate(out_mux2, sparsity_adc, datacfg.bits_per_cell[m]) # gets jth value in this mth xbar
                                 out_mux1 = self.mux1_list[mat_id].propagate(out_snh_neg[m], j) # i is the ith xbar
                                 out_mux2 = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux1) #dummy for directly getting input out, used to simplify the code
-                                out_adc_neg = self.adc_list[adc_id].propagate(out_mux2, sparsity_adc) # gets jth value in this mth xbar
+                                out_adc_neg = self.adc_list[adc_id].propagate(out_mux2, sparsity_adc, datacfg.bits_per_cell[m]) # gets jth value in this mth xbar
 
                                 # shift and add outputs from difefrent wt_bits
                                 #[out_sna, ovf] = self.alu_list[0].propagate (out_sna, out_adc, alu_op, \
                                 #        m * cfg.xbar_bits)
                                 # NOTE here to deal with overflow, we use propagate_float. this should be fixed later
-                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc_pos, 'sna', datacfg.storage_bit[m], return_type = 'float')
-                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc_neg, 'sns', datacfg.storage_bit[m], return_type = 'float')
+                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc_pos, 'sna', datacfg.storaged_bit[m], return_type = 'float')
+                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc_neg, 'sns', datacfg.storaged_bit[m], return_type = 'float')
 
                             
                             # read from xbar's output register
@@ -730,6 +730,7 @@ class ima (object):
                            print ("ima_id: " +str(self.ima_id) + " mat_id: "  +str(i) + " MVM")
                            inner_product(i,'f')
 
+            # TODO for training this need to modify. not supporting negative param yet
             elif (ex_op == 'crs'):
                 # read weights from delta-xbar, synchronize, write to f/b xbars
                 num_xbD = 2 * datacfg.ReRAM_xbar_num
@@ -742,20 +743,20 @@ class ima (object):
                                 # read wt slices from delta xbar to compose a new weight
                                 wt_new_float = 0.0
                                 for m in range (num_xbD):
-                                    wt_new_float += self.matrix_list[mat_id]['d'][2 * m].read(k,l) * (2 ** (2 * datacfg.storage_bit[m] - datacfg.frac_bits)) # left shift
-                                    wt_new_float += self.matrix_list[mat_id]['d'][2 * m + 1].read(k,l) * (2 ** (2 * datacfg.storage_bit[m] + datacfg.storage_config[m] - datacfg.frac_bits)) # left shift
+                                    wt_new_float += self.matrix_list[mat_id]['d'][2 * m].read(k,l) * (2 ** (2 * datacfg.storaged_bit[m] - datacfg.frac_bits)) # left shift
+                                    wt_new_float += self.matrix_list[mat_id]['d'][2 * m + 1].read(k,l) * (2 ** (2 * datacfg.storaged_bit[m] + datacfg.storage_config[m] - datacfg.frac_bits)) # left shift
                                 # write wt slices to f and b xbar
                                 # captures precision loss, as values read from 16 xbars (32-bits) are converted to 16-bits
                                 wt_new_fixed = float2fixed (wt_new_float, datacfg.int_bits, datacfg.frac_bits)
                                 for m in range (num_xbF):               
                                     if (m == 0):
-                                        val = wt_new_fixed[-1 * datacfg.storage_bit(m + 1):]
+                                        val = wt_new_fixed[-1 * datacfg.storaged_bit(m + 1):]
                                     elif m == (num_xbF - 1):
-                                        val = wt_new_fixed[:int(datacfg.storage_config[m])]
+                                        val = wt_new_fixed[:datacfg.bits_per_cell[m]]
                                         # augment sign extension (used in MSB xbar only)
-                                        val = (datacfg.num_bits - datacfg.storage_bit[m])*val[0] + val[0:]
+                                        val = (datacfg.num_bits - datacfg.storaged_bit[m])*val[0] + val[0:]
                                     else:
-                                        val = wt_new_fixed[-1 * datacfg.storage_bit(m + 1): -1 * datacfg.storage_bit(m + 1) + int(datacfg.storage_config[m])]
+                                        val = wt_new_fixed[-1 * datacfg.storaged_bit(m + 1): -1 * datacfg.storaged_bit(m + 1) + datacfg.bits_per_cell[m]]
                                     
                                     val_float = fixed2float(val, datacfg.int_bits, datacfg.frac_bits) # xbar_value in xbar stores float values
                                     self.matrix_list[mat_id]['f'][m].write(k, l, val_float)

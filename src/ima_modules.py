@@ -289,12 +289,13 @@ class adc (object):
         self.latency = param.adc_lat_dict[str(self.adc_res)]
         return self.latency
 
-    def real2bin (self, inp, num_bits):
+    def real2bin (self, inp, num_bits, bits_per_cell = 2, dac_res = cfg.dac_res):
         num_levels = 2**num_bits
-        max_current = param.vdd * param.xbar_conductance_max * cfg.xbar_size
-        min_current = 0
-        step = float(max_current - min_current) / num_levels
-        int_value = int(np.ceil((inp - min_current) / float(step)))
+        conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
+        voltage_step = param.vdd / ((2 ** dac_res) - 1)
+        current_step = voltage_step * conductance_step
+        int_value = int(float(inp) / float(current_step))
+        assert(int_value < num_levels), 'adc overflow'
         bin_value = bin(int_value)[2:]
         return ('0'*(num_bits - len(bin_value)) + bin_value)
 

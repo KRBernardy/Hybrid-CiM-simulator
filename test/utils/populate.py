@@ -61,16 +61,16 @@ for i in os.listdir(THIS_PATH):
                         if (k==0):
                             val = temp_val[-1 * datacfg.storage_bit[k + 1]:]
                         elif (k == datacfg.ReRAM_xbar_num - 1):
-                            val = temp_val[:int(datacfg.storage_config[k])]
+                            val = temp_val[:datacfg.bits_per_cell[k]]
                         else:
-                            val = temp_val[-1 * datacfg.storage_bit[k + 1]: -1 * datacfg.storage_bit[k + 1] + int(datacfg.storage_config[k])]
+                            val = temp_val[-1 * datacfg.storage_bit[k + 1]: -1 * datacfg.storage_bit[k + 1] + datacfg.bits_per_cell[k]]
 
                         # we storage negative resistance values here.
                         # when programing to xbar it will be separated to a positive xbar and a negative xbar
                         if nagitive:
-                            phy_xbar[k][i][j] = -1 * bin2conductance(val, int(datacfg.storage_config[k]))
+                            phy_xbar[k][i][j] = -1 * bin2conductance(val, datacfg.bits_per_cell[k])
                         else:
-                            phy_xbar[k][i][j] = bin2conductance(val, int(datacfg.storage_config[k]))
+                            phy_xbar[k][i][j] = bin2conductance(val, datacfg.bits_per_cell[k])
 ## save log_xbar and phy_xbar to disc
             np.save (wt_path+'log_xbar'+str(mat_id), log_xbar)
             for k in range (datacfg.ReRAM_xbar_num):
