@@ -4,6 +4,7 @@ import sys
 
 # import dependency files
 import config as cfg
+from data_config import datacfg
 import constants as param
 
 # Compute metrics of the ima based on paramaters in config file and dicts in constants file
@@ -12,7 +13,7 @@ def compute_area (): #in mm2
     area = 0.0
     if cfg.MVMU_ver == "Analog":
         area += (cfg.num_matrix*11) * cfg.xbar_size * param.dac_area # 1 dac for input of f/b/d xbars, each phy xbar in d-xbar will have a dac_array, hence 8
-        area += (cfg.num_matrix*2) * cfg.xbar_size * param.snh_area # snh for f/b xbars
+        area += (cfg.num_matrix*2*2) * cfg.xbar_size * param.snh_area # snh for f/b xbars, also for both positive and negative xbar
         area += (cfg.num_matrix*2) * param.sna_area # sna for one each f/b xbars
         area += cfg.num_adc * param.adc_area # adc
         area += (cfg.num_matrix*3) * param.xbar_outMem_area # xbar_outMem (1 OR for 8 xbars - 16 bit weights, 2 bit xbars)

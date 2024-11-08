@@ -59,11 +59,11 @@ for i in os.listdir(THIS_PATH):
                     assert (len(temp_val) == datacfg.num_bits)
                     for k in range(datacfg.ReRAM_xbar_num):
                         if (k==0):
-                            val = temp_val[-1 * datacfg.storage_bit[k + 1]:]
+                            val = temp_val[-1 * datacfg.storaged_bit[k + 1]:]
                         elif (k == datacfg.ReRAM_xbar_num - 1):
                             val = temp_val[:datacfg.bits_per_cell[k]]
                         else:
-                            val = temp_val[-1 * datacfg.storage_bit[k + 1]: -1 * datacfg.storage_bit[k + 1] + datacfg.bits_per_cell[k]]
+                            val = temp_val[-1 * datacfg.storaged_bit[k + 1]: -1 * datacfg.storaged_bit[k + 1] + datacfg.bits_per_cell[k]]
 
                         # we storage negative resistance values here.
                         # when programing to xbar it will be separated to a positive xbar and a negative xbar

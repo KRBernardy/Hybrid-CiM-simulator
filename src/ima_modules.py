@@ -41,7 +41,7 @@ class xbar (object):
                     if xbar_value[i][j] > 0:
                         self.xbar_value_pos[i][j] = xbar_value[i][j]
                     else:
-                        self.xbar_value_neg[i][j] = xbar_value[i][j]
+                        self.xbar_value_neg[i][j] = -1 * xbar_value[i][j]
 
         # xbar output currents are recorded fro analysis of applicable
         self.xb_record = []
@@ -72,7 +72,7 @@ class xbar (object):
                     if xbar_value[i][j] > 0:
                         self.xbar_value_pos[i][j] = xbar_value[i][j]
                     else:
-                        self.xbar_value_neg[i][j] = xbar_value[i][j]
+                        self.xbar_value_neg[i][j] = -1 * xbar_value[i][j]
 
     # writes to a location on xbar
     def write (self, k, l, value):
@@ -85,7 +85,7 @@ class xbar (object):
             self.xbar_value_neg[k][l] = 0
         else:
             self.xbar_value_pos[k][l] = 0
-            self.xbar_value_neg[k][l] = value
+            self.xbar_value_neg[k][l] = -1 * value
 
     # reads a location on xbar with ReRAM accuracy degradtion
     def read (self, k, l, accurate = False):
@@ -132,6 +132,7 @@ class xbar (object):
             noise_neg = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
             out_neg = np.dot(inp, self.xbar_value_neg + noise_neg)
         self.record([out_pos, out_neg])
+        np.set_printoptions(threshold = np.inf)
         return [out_pos, out_neg]
 
     def propagate_dummy (self, inp = 'nil', sparsity = 0, accurate = False):
@@ -301,7 +302,7 @@ class adc (object):
 
     # Here we allow the adc to deal with negative inputs
     # in real circult it should calculate twice, first time for all positive value
-    def propagate (self, inp, sparsity = 0):
+    def propagate (self, inp, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0):
         if sparsity<50:
             self.num_access['n'] += 1
             self.adc_res = cfg.adc_res
@@ -330,7 +331,7 @@ class adc (object):
             self.adc_res = 1
         assert (type(inp) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
         num_bits = self.adc_res
-        return self.real2bin (inp, num_bits)
+        return self.real2bin (inp, num_bits, bits_per_cell, dac_res)
 
     # HACK - until propagate doesn't have correct analog functionality
     def propagate_dummy (self, inp, sparsity = 0):

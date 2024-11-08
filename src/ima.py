@@ -651,10 +651,10 @@ class ima (object):
                                 adc_id = (mat_id * datacfg.ReRAM_xbar_num + m) % cfg.num_adc
                                 out_mux1 = self.mux1_list[mat_id].propagate(out_snh_pos[m], j) # i is the ith xbar
                                 out_mux2 = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux1) #dummy for directly getting input out, used to simplify the code
-                                out_adc_pos = self.adc_list[adc_id].propagate(out_mux2, sparsity_adc, datacfg.bits_per_cell[m]) # gets jth value in this mth xbar
+                                out_adc_pos = self.adc_list[adc_id].propagate(out_mux2, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc) # gets jth value in this mth xbar
                                 out_mux1 = self.mux1_list[mat_id].propagate(out_snh_neg[m], j) # i is the ith xbar
                                 out_mux2 = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux1) #dummy for directly getting input out, used to simplify the code
-                                out_adc_neg = self.adc_list[adc_id].propagate(out_mux2, sparsity_adc, datacfg.bits_per_cell[m]) # gets jth value in this mth xbar
+                                out_adc_neg = self.adc_list[adc_id].propagate(out_mux2, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc) # gets jth value in this mth xbar
 
                                 # shift and add outputs from difefrent wt_bits
                                 #[out_sna, ovf] = self.alu_list[0].propagate (out_sna, out_adc, alu_op, \

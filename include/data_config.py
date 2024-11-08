@@ -38,3 +38,4 @@ class num_config:
 # a 16 bit parameter, 10 lower bits storaged in 5 2-bit ReRAM MLCs, 2 middle bits storaged in 2 ReRAM SLCs, 4 higher bits storaged in 4 SRAMs
 # 12 int bit, 4 frac bit
 datacfg = num_config(['2', '2', '2', '2', '2', '2', '2', '2'], 12)
+#datacfg = num_config(['1', '1', '1', '1', '2', '2', '2', '2', '2', '2'], 12)

@@ -108,7 +108,7 @@ def get_hw_stats (fid, node_dut, cycle):
             sum_num_cycle_ima += node_dut.tile_list[i].ima_list[j].cycle_count # used for leakage energy of imas
 
             mvmu_type = ['f', 'b', 'd']
-            for k in range (datacfg.ReRAM_xbar_num):
+            for k in range (cfg.num_matrix):
                 for mvmu_t in mvmu_type:
                     # Xbar accesses
                     if cfg.MVMU_ver == "Analog":
@@ -155,7 +155,8 @@ def get_hw_stats (fid, node_dut, cycle):
 
             if cfg.MVMU_ver == "Analog":
                 for k in range (2*cfg.num_matrix*datacfg.ReRAM_xbar_num):
-                    hw_comp_access['snh'] += (node_dut.tile_list[i].ima_list[j].snh_list[k].num_access * cfg.xbar_size) # each snh is
+                    hw_comp_access['snh'] += (node_dut.tile_list[i].ima_list[j].snh_list_pos[k].num_access * cfg.xbar_size)
+                    hw_comp_access['snh'] += (node_dut.tile_list[i].ima_list[j].snh_list_neg[k].num_access * cfg.xbar_size) # each snh is
                     # basically an array of multiple snhs (individual power in constants file must be for one discerete snh)
 
             for k in range (2*cfg.num_matrix):
