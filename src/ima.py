@@ -822,7 +822,9 @@ class ima (object):
                 cfg.xbar_bits) /math.ceil(float(cfg.data_width)/cfg.xbar_bits)) # last term to account for the effect of quantization on latency
                 ## MVM outer product occurs in 4 cycles to take care of all i/o polarities (++, +-, -+, --)
                 num_phase = 4
-                lat_temp = self.matrix_list[0]['f'][0].getOpLatency()
+                lat_temp = 0
+                for m in datacfg.ReRAM_xbar_num:
+                    lat_temp = max(self.matrix_list[0]['f'][m].getOpLatency(), temp_lat)
                 #latency_op = lat_temp * num_phase * d_found
                 latency_op = lat_temp * num_phase * float(int(d_found>0))
                 ## output latency should be the max of ip/op operation
@@ -900,7 +902,11 @@ class ima (object):
 
                 # Needs update - use xbar serial read latency
                 elif (ex_op == 'crs'):
-                    temp_lat = max(self.matrix_list[0]['f'][0].getWrLatency(), self.matrix_list[0]['f'][0].getRdLatency())
+                    temp_lat = 0
+                    for m in datacfg.ReRAM_xbar_num:
+                        temp_lat = max(self.matrix_list[0]['f'][m].getWrLatency(), temp_lat)
+                        temp_lat = max(self.matrix_list[0]['f'][m].getRdLatency(), temp_lat)
+                    
                     self.stage_latency[sId] = temp_lat
 
                 elif (ex_op in ['beq', 'alu_int']):
