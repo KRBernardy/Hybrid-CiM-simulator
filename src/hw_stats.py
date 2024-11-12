@@ -15,20 +15,11 @@ nj = 10 ** (-9)
 
 # Copied from /include/constants.py file
 # Enlists components at core, tile, and node levels
-hw_comp_energy = {'xbar_mvm':{  '0':param.xbar_ip_energy_dict['0'], \
-                                '90': param.xbar_ip_energy_dict['90'], \
-                                '80': param.xbar_ip_energy_dict['80'], \
-                                '70': param.xbar_ip_energy_dict['70'], \
-                                '60': param.xbar_ip_energy_dict['60'], \
-                                '50': param.xbar_ip_energy_dict['50'], \
-                                '40': param.xbar_ip_energy_dict['40'], \
-                                '30': param.xbar_ip_energy_dict['30'], \
-                                '20': param.xbar_ip_energy_dict['20'], \
-                                '10': param.xbar_ip_energy_dict['10']}, \
-        'xbar_op':param.xbar_ip_energy_dict['0'], \
-        'xbar_mtvm':param.xbar_ip_energy_dict['0'], \
-        'xbar_rd':param.xbar_rd_pow_dyn*param.xbar_rd_lat, \
-        'xbar_wr':param.xbar_wr_pow_dyn*param.xbar_wr_lat,
+hw_comp_energy = {'xbar_mvm':{}, \
+        'xbar_op': {}, \
+        'xbar_mtvm': {}, \
+        'xbar_rd': {}, \
+        'xbar_wr': {},
         'dac':param.dac_pow_dyn, 'snh':param.snh_pow_dyn, \
         'mux1':param.mux_pow_dyn, 'mux2':param.mux_pow_dyn, \
         'adc':{ 'n' :    param.adc_pow_dyn_dict[str(cfg.adc_res)]   if cfg.adc_res>0   else 0, \
@@ -54,13 +45,24 @@ hw_comp_energy = {'xbar_mvm':{  '0':param.xbar_ip_energy_dict['0'], \
         'tile_control':param.tcu_pow
         }
 
+for bits_per_cell in range(1, 9):
+    hw_comp_energy['xbar_mvm'][str(bits_per_cell)] = {}
+    for sparsity in range(0, 100, 10):
+        hw_comp_energy['xbar_mvm'][str(bits_per_cell)][str(sparsity)] = param.xbar_ip_energy_dict[str(bits_per_cell)][str(sparsity)]
+    hw_comp_energy['xbar_mtvm'][str(bits_per_cell)] = param.xbar_ip_energy_dict[str(bits_per_cell)]['0']
+    hw_comp_energy['xbar_op'][str(bits_per_cell)] = param.xbar_ip_energy_dict[str(bits_per_cell)]['0']
+    hw_comp_energy['xbar_rd'][str(bits_per_cell)] = param.xbar_rd_pow_dyn_dict[str(bits_per_cell)] * param.xbar_rd_lat_dict[str(bits_per_cell)]
+    hw_comp_energy['xbar_wr'][str(bits_per_cell)] = param.xbar_wr_pow_dyn_dict[str(bits_per_cell)] * param.xbar_wr_lat_dict[str(bits_per_cell)]
+
 # Used to calculate dynamic energy consumption and other metrics (area/time/total_power/peak_power)
 def get_hw_stats (fid, node_dut, cycle):
 
     # List of all components that dissipate power
-    hw_comp_access = {'xbar_mvm':{  '0':0, '90': 0,'80': 0,'70': 0,'60': 0,'50': 0,'40': 0,'30': 0,'20': 0,'10': 0}, \
-            'xbar_op':0, 'xbar_mtvm':0, \
-            'xbar_rd':0, 'xbar_wr':0, \
+    hw_comp_access = {'xbar_mvm': {}, \
+            'xbar_op': {}, \
+            'xbar_mtvm': {}, \
+            'xbar_rd': {}, \
+            'xbar_wr': {}, \
             'dac':0, 'snh':0, \
             'mux1':0, 'mux2':0, 'adc':{ 'n' :    0, \
                                         'n/2':   0, \
@@ -81,6 +83,15 @@ def get_hw_stats (fid, node_dut, cycle):
             'noc_intra':0, 'noc_inter':0, \
             'core_control':0, 'tile_control': 0 \
             }
+    
+    for bits_per_cell in range(1, 9):
+        hw_comp_access['xbar_mvm'][str(bits_per_cell)] = {}
+        for sparsity in range(0, 100, 10):
+            hw_comp_access['xbar_mvm'][str(bits_per_cell)][str(sparsity)] = 0
+        hw_comp_access['xbar_mtvm'][str(bits_per_cell)] = 0
+        hw_comp_access['xbar_op'][str(bits_per_cell)] = 0
+        hw_comp_access['xbar_rd'][str(bits_per_cell)] = 0
+        hw_comp_access['xbar_wr'][str(bits_per_cell)] = 0
 
     # traverse components to populate dict (hw_comp_access)
     hw_comp_access['noc_intra'] += node_dut.noc.num_cycles_intra
@@ -114,15 +125,19 @@ def get_hw_stats (fid, node_dut, cycle):
                     if cfg.MVMU_ver == "Analog":
                         for m in range(datacfg.ReRAM_xbar_num):
                             if (mvmu_t == 'd'):
-                                hw_comp_access['xbar_op'] += node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].num_access['0']
+                                hw_comp_access['xbar_op'][node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].bitsPerCell()] += \
+                                    node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].num_access['0']
                             elif (mvmu_t == 'b'):
-                                hw_comp_access['xbar_mtvm'] += node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].num_access['0']
+                                hw_comp_access['xbar_mtvm'][node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].bitsPerCell()] += \
+                                    node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].num_access['0']
                             else:
-                                for key,value in hw_comp_access['xbar_mvm'].items():
-                                    hw_comp_access['xbar_mvm'][key] += node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].num_access[key]
-                            hw_comp_access['xbar_rd'] += \
+                                for sparsity in range(0, 100, 10):
+                                    key = str(sparsity)
+                                    hw_comp_access['xbar_mvm'][node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].bitsPerCell()][key] += \
+                                        node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].num_access[key]
+                            hw_comp_access['xbar_rd'][node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].bitsPerCell()] += \
                             node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].num_access_rd / (cfg.xbar_size**2)
-                            hw_comp_access['xbar_wr'] += \
+                            hw_comp_access['xbar_wr'][node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].bitsPerCell()] += \
                             node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][m].num_access_wr / (cfg.xbar_size**2)
                     
                     else:
@@ -193,23 +208,24 @@ def get_hw_stats (fid, node_dut, cycle):
     hw_comp_access['tile_control'] = sum_num_cycle_ima
 
     total_energy = 0
-    total_adc_energy = 0
-    total_adc_access = 0
+    total_part_energy = {'adc': 0, 'xbar_op': 0, 'xbar_mtvm': 0, 'xbar_rd': 0, 'xbar_wr': 0}
+    total_part_access = {'adc': 0, 'xbar_op': 0, 'xbar_mtvm': 0, 'xbar_rd': 0, 'xbar_wr': 0}
     total_mvm_energy = 0
     total_mvm_access = 0
     # Compute the total dynamic energy consumption
     if cfg.MVMU_ver == "Analog":
         for key, value in hw_comp_access.items():
-            if key == 'adc':
-                for key1, value1 in hw_comp_access['adc'].items():
-                    total_energy += value1*hw_comp_energy['adc'][key1]
-                    total_adc_energy +=  value1*hw_comp_energy['adc'][key1] # Not needed for function but for output visualisation
-                    total_adc_access += value1
-            elif key == 'xbar_mvm':
-                for key1, value1 in hw_comp_access['xbar_mvm'].items():
-                    total_energy += value1*hw_comp_energy['xbar_mvm'][key1]
-                    total_mvm_energy +=  value1*hw_comp_energy['xbar_mvm'][key1] # Not needed for function but for output visualisation
-                    total_mvm_access += value1
+            if key == 'xbar_mvm':
+                for bits_per_cell in range(1, 9):
+                    for key1, value1 in hw_comp_access['xbar_mvm'][str(bits_per_cell)].items():
+                        total_energy += value1 * hw_comp_energy['xbar_mvm'][str(bits_per_cell)][key1]
+                        total_mvm_energy +=  value1*hw_comp_energy['xbar_mvm'][str(bits_per_cell)][key1] # Not needed for function but for output visualisation
+                        total_mvm_access += value1
+            elif key in ['adc', 'xbar_op', 'xbar_mtvm', 'xbar_rd', 'xbar_wr']:
+                for key1, value1 in hw_comp_access[key].items():
+                    total_energy += value1 * hw_comp_energy[key][key1]
+                    total_part_energy[key] += value1 * hw_comp_energy[key][key1]
+                    total_part_access[key] += value1
             else:
                 total_energy += value * hw_comp_energy[key]
     else:
@@ -224,6 +240,9 @@ def get_hw_stats (fid, node_dut, cycle):
                     total_energy += (value1/16)*hw_comp_energy['xbar_mvm'][key1]
                     total_mvm_energy +=  (value1/16)*hw_comp_energy['xbar_mvm'][key1] # Not needed for function but for output visualisation
                     total_mvm_access += (value1/16)
+            elif key == 'xbar_op' :
+                for bits_per_cell, value1 in hw_comp_access[key].items():
+                    total_energy += value1 * hw_comp_energy[key][bits_per_cell]
             else:
                 total_energy += value * hw_comp_energy[key]
 
@@ -235,14 +254,14 @@ def get_hw_stats (fid, node_dut, cycle):
         # put extra spaces for better visulalization of values
         bl_spc1 = (28-len(key)) * ' '
         # bl_spc2 = (22-len(str(value))) * ' '
-        if key == 'adc':
-            bl_spc2 = (22-len(str(total_adc_access))) * ' '
-            fid.write (key + bl_spc1 + str(total_adc_access) + bl_spc2 +\
-                        (str(total_adc_energy/total_energy*100))[0:4] + ' %\n')
-        elif key == 'xbar_mvm':
+        if key == 'xbar_mvm':
             bl_spc2 = (22-len(str(total_mvm_access))) * ' '
             fid.write (key + bl_spc1 + str(total_mvm_access) + bl_spc2 +\
                         (str(total_mvm_energy/total_energy*100))[0:4] + ' %\n')
+        elif key in ['adc', 'xbar_op', 'xbar_mtvm', 'xbar_rd', 'xbar_wr']:
+            bl_spc2 = (22-len(str(total_part_access[key]))) * ' '
+            fid.write (key + bl_spc1 + str(total_part_access[key]) + bl_spc2 +\
+                        (str(total_part_energy[key]/total_energy*100))[0:4] + ' %\n')
         else:
             bl_spc2 = (22-len(str(value))) * ' '
             fid.write (key + bl_spc1 + str(value) + bl_spc2 +\

@@ -24,10 +24,10 @@ class xbar (object):
 
         # define latency for various xbar operations
         # latency for write should vary with bits_per_cell, to be add later
-        self.latency_ip = param.xbar_ip_lat
-        self.latency_op = param.xbar_op_lat
-        self.latency_rd = param.xbar_rd_lat
-        self.latency_wr = param.xbar_wr_lat
+        self.latency_ip = param.xbar_ip_lat_dict[str(bits_per_cell)]
+        self.latency_op = param.xbar_op_lat_dict[str(bits_per_cell)]
+        self.latency_rd = param.xbar_rd_lat_dict[str(bits_per_cell)]
+        self.latency_wr = param.xbar_wr_lat_dict[str(bits_per_cell)]
 
         # xbar_value is the weights meant for one crossbar
         self.xbar_size = xbar_size
@@ -53,7 +53,7 @@ class xbar (object):
         self.xb_record.append(xb_out)
 
     def bitsPerCell(self):
-        return self.bits_per_cell
+        return str(self.bits_per_cell)
 
     def get_value(self):
         print(self.xbar_value_pos)

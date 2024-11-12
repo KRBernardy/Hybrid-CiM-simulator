@@ -109,20 +109,98 @@ xbar_area_dict = {'2': {'32' : 1.5625 * 10**(-6),
 
 ## New values added for xbar MVM/MTVM, OP (parallel write), serial read/write
 # the following is lumped power for xbar inner/outer-product - includes peripherals
+
 xbar_op_lat = 20.0*12.8 # with 4 VFUs
-xbar_op_pow = 4.44 * 3.27 / (12.8)
+#xbar_op_pow = 4.44 * 3.27 / (12.8)
 
 xbar_ip_lat = 100.0
 #xbar_ip_pow = (1.37*2.0) # xbar_ip_pow (includes all mvmu)
-xbar_ip_pow = (1.37*2.0) - 1.04 # xbar_ip_pow (includes all mvmu except ADC - uncomment num_access for ADC object)
+#xbar_ip_pow = (1.37*2.0) - 1.04 # xbar_ip_pow (includes all mvmu except ADC - uncomment num_access for ADC object)
 
 # Note the read and write lat/pow are for entire xbar
 xbar_rd_lat = 328.0 * 1000 * (1/32.0)
 xbar_wr_lat = 351.0 * 1000 * (1/32.0)
 
 # the following is lumped power for xbar rd/wr (for whole array) - includes peripherals
-xbar_rd_pow = 208.0 * 1000 * (1/32.0) / xbar_rd_lat
-xbar_wr_pow = 676.0 * 1000 * (1/32.0) / xbar_rd_lat
+#xbar_rd_pow = 208.0 * 1000 * (1/32.0) / xbar_rd_lat
+#xbar_wr_pow = 676.0 * 1000 * (1/32.0) / xbar_rd_lat
+
+
+## the above are now dicts since we want them to be different for different cells
+
+xbar_op_lat_dict = {'1': 20.0 * 12.8,
+                    '2': 20.0 * 12.8,
+                    '3': 20.0 * 12.8,
+                    '4': 20.0 * 12.8,
+                    '5': 20.0 * 12.8,
+                    '6': 20.0 * 12.8,
+                    '7': 20.0 * 12.8,
+                    '8': 20.0 * 12.8}
+
+xbar_op_pow_dict = {'1': 4.44 * 3.27 / (12.8),
+                    '2': 4.44 * 3.27 / (12.8),
+                    '3': 4.44 * 3.27 / (12.8),
+                    '4': 4.44 * 3.27 / (12.8),
+                    '5': 4.44 * 3.27 / (12.8),
+                    '6': 4.44 * 3.27 / (12.8),
+                    '7': 4.44 * 3.27 / (12.8),
+                    '8': 4.44 * 3.27 / (12.8)}
+
+xbar_ip_lat_dict = {'1': 100.0,
+                    '2': 100.0,
+                    '3': 100.0,
+                    '4': 100.0,
+                    '5': 100.0,
+                    '6': 100.0,
+                    '7': 100.0,
+                    '8': 100.0}
+
+xbar_ip_pow_dict = {'1': 1.37 * 2.0 - 1.04,
+                    '2': 1.37 * 2.0 - 1.04,
+                    '3': 1.37 * 2.0 - 1.04,
+                    '4': 1.37 * 2.0 - 1.04,
+                    '5': 1.37 * 2.0 - 1.04,
+                    '6': 1.37 * 2.0 - 1.04,
+                    '7': 1.37 * 2.0 - 1.04,
+                    '8': 1.37 * 2.0 - 1.04}
+
+xbar_rd_lat_dict = {'1': 328.0 * 1000 * (1 / 32.0),
+                    '2': 328.0 * 1000 * (1 / 32.0),
+                    '3': 328.0 * 1000 * (1 / 32.0),
+                    '4': 328.0 * 1000 * (1 / 32.0),
+                    '5': 328.0 * 1000 * (1 / 32.0),
+                    '6': 328.0 * 1000 * (1 / 32.0),
+                    '7': 328.0 * 1000 * (1 / 32.0),
+                    '8': 328.0 * 1000 * (1 / 32.0)}
+
+xbar_wr_lat_dict = {'1': 351.0 * 1000 * (1 / 32.0),
+                    '2': 351.0 * 1000 * (1 / 32.0),
+                    '3': 351.0 * 1000 * (1 / 32.0),
+                    '4': 351.0 * 1000 * (1 / 32.0),
+                    '5': 351.0 * 1000 * (1 / 32.0),
+                    '6': 351.0 * 1000 * (1 / 32.0),
+                    '7': 351.0 * 1000 * (1 / 32.0),
+                    '8': 351.0 * 1000 * (1 / 32.0)}
+
+xbar_rd_pow_dict = {'1': 208.0 * 1000 * (1 / 32.0) / xbar_rd_lat_dict['1'],
+                    '2': 208.0 * 1000 * (1 / 32.0) / xbar_rd_lat_dict['2'],
+                    '3': 208.0 * 1000 * (1 / 32.0) / xbar_rd_lat_dict['3'],
+                    '4': 208.0 * 1000 * (1 / 32.0) / xbar_rd_lat_dict['4'],
+                    '5': 208.0 * 1000 * (1 / 32.0) / xbar_rd_lat_dict['5'],
+                    '6': 208.0 * 1000 * (1 / 32.0) / xbar_rd_lat_dict['6'],
+                    '7': 208.0 * 1000 * (1 / 32.0) / xbar_rd_lat_dict['7'],
+                    '8': 208.0 * 1000 * (1 / 32.0) / xbar_rd_lat_dict['8']}
+
+xbar_wr_pow_dict = {'1': 676.0 * 1000 * (1 / 32.0) / xbar_wr_lat_dict['1'],
+                    '2': 676.0 * 1000 * (1 / 32.0) / xbar_wr_lat_dict['2'],
+                    '3': 676.0 * 1000 * (1 / 32.0) / xbar_wr_lat_dict['3'],
+                    '4': 676.0 * 1000 * (1 / 32.0) / xbar_wr_lat_dict['4'],
+                    '5': 676.0 * 1000 * (1 / 32.0) / xbar_wr_lat_dict['5'],
+                    '6': 676.0 * 1000 * (1 / 32.0) / xbar_wr_lat_dict['6'],
+                    '7': 676.0 * 1000 * (1 / 32.0) / xbar_wr_lat_dict['7'],
+                    '8': 676.0 * 1000 * (1 / 32.0) / xbar_wr_lat_dict['8']}
+
+
 
 # DAC - Discuss exact values with ISSAC authors
 dac_lat_dict = {'1' : 1,
@@ -340,6 +418,7 @@ xbar_inMem_area_dict = {'32'  : 0.00015,
                         '256' : 0.0019}
 
 # Xbar_outMem value dictionary
+# storing 16-bit value
 xbar_outMem_lat_dict = {'32'  : 1, # indexed with xbar size
                        '64'   : 1,
                        '128'  : 1,
@@ -363,15 +442,18 @@ xbar_outMem_area_dict = {'32'  : 0.00015,
 
 # Chosen latency based on config file - only for components whose latency is parameter dependent
 #xbar_lat = xbar_lat_dict [str(cfg.xbar_bits)][str(cfg.xbar_size)]
+'''
 xbar_ip_lat_dict = {'0':0, '90':0, '80':0, '70':0, '60':0, '50':0, '40':0, '30':0, '20':0, '10':0}
 if cfg.MVMU_ver == "Analog":
       for key, value in xbar_ip_lat_dict.items():
             xbar_ip_lat_dict[key] = xbar_ip_lat
 else:
       xbar_ip_lat_dict = digi_param.Digital_xbar_lat_dict[cfg.MVMU_ver][str(cfg.xbar_size)]
+
 xbar_op_lat = xbar_op_lat
 xbar_rd_lat = xbar_rd_lat
 xbar_wr_lat = xbar_wr_lat
+'''
 dac_lat = dac_lat_dict [str(cfg.dac_res)]
 #FIXME need to review it I can remove adc_lat property
 adc_lat = adc_lat_dict [str(cfg.adc_res)]
@@ -394,10 +476,10 @@ dataMem_area =  dataMem_area_dict[str(cfg.dataMem_size)]
 
 # Chosen dyn_power based on config file - only for components whose latency is parameter dependent
 #xbar_pow_dyn = xbar_pow_dict [str(cfg.xbar_bits)][str(cfg.xbar_size)]
-xbar_ip_pow_dyn = xbar_ip_pow
-xbar_op_pow_dyn = xbar_op_pow
-xbar_rd_pow_dyn = xbar_rd_pow
-xbar_wr_pow_dyn = xbar_wr_pow
+xbar_ip_pow_dyn_dict = xbar_ip_pow_dict
+xbar_op_pow_dyn_dict = xbar_op_pow_dict
+xbar_rd_pow_dyn_dict = xbar_rd_pow_dict
+xbar_wr_pow_dyn_dict = xbar_wr_pow_dict
 dac_pow_dyn = dac_pow_dyn_dict [str(cfg.dac_res)]
 adc_pow_dyn = adc_pow_dyn_dict [str(cfg.adc_res)]
 xbar_inMem_pow_dyn_read = xbar_inMem_pow_dyn_read_dict[str(cfg.xbar_size)]
@@ -407,10 +489,13 @@ instrnMem_pow_dyn =  instrnMem_pow_dyn_dict[str(cfg.instrnMem_size)] * math.sqrt
 dataMem_pow_dyn =  dataMem_pow_dyn_dict[str(cfg.dataMem_size)]
 
 # Energy
-xbar_ip_energy_dict = {'0':0, '90':0, '80':0, '70':0, '60':0, '50':0, '40':0, '30':0, '20':0, '10':0}
+xbar_ip_energy_dict = {}
 if cfg.MVMU_ver == "Analog":
-        for key,value in xbar_ip_energy_dict.items():
-                xbar_ip_energy_dict[key] = xbar_ip_lat*xbar_ip_pow_dyn
+        for bits_per_cell in range(1, 9):
+                xbar_ip_energy_dict[str(bits_per_cell)] = {}
+                for sparsity in range(0, 100, 10):
+                        xbar_ip_energy_dict[str(bits_per_cell)][str(sparsity)] = \
+                                xbar_ip_lat_dict[str(bits_per_cell)] * xbar_ip_pow_dyn_dict[str(bits_per_cell)]
 else:
         xbar_ip_energy_dict = digi_param.Digital_xbar_energy_dict[cfg.MVMU_ver][str(cfg.xbar_size)]
 print('xbar_ip_energy_dict', xbar_ip_energy_dict)
