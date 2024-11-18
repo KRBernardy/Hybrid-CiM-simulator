@@ -37,10 +37,9 @@ data_width = datacfg.num_bits # (in bits)
 xbdata_width = data_width # (in bits)
 instrn_width = 48 # (in bits)
 # Input and Weight parameters
-input_prec = 16
-weight_width = 16
+input_prec = datacfg.num_bits
+weight_width = datacfg.num_bits
 # Change here - Specify the IMA parameters here
-xbar_bits = 2
 num_matrix = 6 # each matrix is 1-fw logical xbar for inference and 1-fw, 1-bw, and 1 delta logical xbar for training. Each logical xbar for inference is 8-fw physical xbar and for training  8-fw, 8-bw and 16-delta physical xbars.
 xbar_size = 128
 dac_res = 1

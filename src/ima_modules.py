@@ -131,8 +131,9 @@ class xbar (object):
             out_pos = np.dot(inp, self.xbar_value_pos + noise_pos)
             noise_neg = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
             out_neg = np.dot(inp, self.xbar_value_neg + noise_neg)
+            out_pos[out_pos < 0] = 0 #conductance should not be negative, set all negataive values 0
+            out_neg[out_neg < 0] = 0
         self.record([out_pos, out_neg])
-        np.set_printoptions(threshold = np.inf)
         return [out_pos, out_neg]
 
     def propagate_dummy (self, inp = 'nil', sparsity = 0, accurate = False):
@@ -178,7 +179,7 @@ class xbar (object):
 # TODO this is used to deal with the delta when training. not modified yet. further investigation on how ReRAM accuracy degradtion needed
 class xbar_op (xbar):
     # add function for outer_product computation
-    def propagate_op (self, inp1 = 'nil', inp2 = 'nil', lr=1, in1_bit=cfg.dac_res, in2_bit=cfg.xbar_bits):
+    def propagate_op (self, inp1, inp2, lr, in1_bit, in2_bit):
         # inner-product and outer_product functions should have different energies (and other metrics) - NEEDS UPDATE
         self.num_access['0'] += 1
         # check both data inputs

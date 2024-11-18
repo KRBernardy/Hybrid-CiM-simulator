@@ -37,5 +37,11 @@ class num_config:
 # e.g. ['2', '2', '2', '2', '2', '1', '1', 's', 's', 's', 's'], 12: 
 # a 16 bit parameter, 10 lower bits stored in 5 2-bit ReRAM MLCs, 2 middle bits stored in 2 ReRAM SLCs, 4 higher bits stored in 4 SRAMs
 # 12 int bit, 4 frac bit
-datacfg = num_config(['2', '2', '2', '2', '2', '2', '2', '2'], 12)
-#datacfg = num_config(['1', '1', '1', '1', '2', '2', '2', '2', '2', '2'], 12)
+datacfg_test_list = [num_config(['2', '2', '2', '2', '2', '2', '2', '2'], 12),
+                     num_config(['1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1'], 12),
+                     num_config(['3', '3', '3', '3', '2', '2'], 12),
+                     num_config(['4', '4', '4', '4'], 12),
+                     num_config(['1', '1', '1', '1', '2', '2', '2', '2', '2', '2'], 12),
+                     num_config(['4', '2', '2', '2', '2', '1', '1', '1', '1'], 12)]
+
+datacfg = datacfg_test_list[0]

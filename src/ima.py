@@ -706,7 +706,7 @@ class ima (object):
                                 temp = [val[-((m+1)*cfg.xbar_bits):-(m*cfg.xbar_bits)] for val in out_xb_outMem_temp]
                             out_dac2 = self.dacArray_list[mat_id]['d_c'].propagate (temp)
 
-                            self.matrix_list[mat_id][key][m].propagate_op (out_dac1, out_dac2, cfg.lr)
+                            self.matrix_list[mat_id][key][m].propagate_op (out_dac1, out_dac2, cfg.lr, cfg.dac_res, self.matrix_list[mat_id][key][m].bits_per_cell)
 
                 ## Traverse through the matrices in a core
                 if (cfg.training):
@@ -818,13 +818,14 @@ class ima (object):
                     print("adccccc.adc_res", adccccc.adc_res)
                 print("---")
                 '''
-                latency_ip = lat_temp * ((cfg.input_prec / cfg.dac_res) + num_stage - 1) * float(int(fb_found>0))*(math.ceil(float(cfg.weight_width)/ \
-                cfg.xbar_bits) /math.ceil(float(cfg.data_width)/cfg.xbar_bits)) # last term to account for the effect of quantization on latency
+                latency_ip = lat_temp * ((cfg.input_prec / cfg.dac_res) + num_stage - 1) * float(int(fb_found>0))
+                #latency_ip = lat_temp * ((cfg.input_prec / cfg.dac_res) + num_stage - 1) * float(int(fb_found>0))*(math.ceil(float(cfg.weight_width)/ \
+                #cfg.xbar_bits) /math.ceil(float(cfg.data_width)/cfg.xbar_bits)) # last term to account for the effect of quantization on latency
                 ## MVM outer product occurs in 4 cycles to take care of all i/o polarities (++, +-, -+, --)
                 num_phase = 4
                 lat_temp = 0
-                for m in datacfg.ReRAM_xbar_num:
-                    lat_temp = max(self.matrix_list[0]['f'][m].getOpLatency(), temp_lat)
+                for m in range(datacfg.ReRAM_xbar_num):
+                    lat_temp = max(self.matrix_list[0]['f'][m].getOpLatency(), lat_temp)
                 #latency_op = lat_temp * num_phase * d_found
                 latency_op = lat_temp * num_phase * float(int(d_found>0))
                 ## output latency should be the max of ip/op operation

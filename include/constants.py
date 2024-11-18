@@ -110,16 +110,16 @@ xbar_area_dict = {'2': {'32' : 1.5625 * 10**(-6),
 ## New values added for xbar MVM/MTVM, OP (parallel write), serial read/write
 # the following is lumped power for xbar inner/outer-product - includes peripherals
 
-xbar_op_lat = 20.0*12.8 # with 4 VFUs
+#xbar_op_lat = 20.0*12.8 # with 4 VFUs
 #xbar_op_pow = 4.44 * 3.27 / (12.8)
 
-xbar_ip_lat = 100.0
+#xbar_ip_lat = 100.0
 #xbar_ip_pow = (1.37*2.0) # xbar_ip_pow (includes all mvmu)
 #xbar_ip_pow = (1.37*2.0) - 1.04 # xbar_ip_pow (includes all mvmu except ADC - uncomment num_access for ADC object)
 
 # Note the read and write lat/pow are for entire xbar
-xbar_rd_lat = 328.0 * 1000 * (1/32.0)
-xbar_wr_lat = 351.0 * 1000 * (1/32.0)
+#xbar_rd_lat = 328.0 * 1000 * (1/32.0)
+#xbar_wr_lat = 351.0 * 1000 * (1/32.0)
 
 # the following is lumped power for xbar rd/wr (for whole array) - includes peripherals
 #xbar_rd_pow = 208.0 * 1000 * (1/32.0) / xbar_rd_lat
@@ -164,19 +164,19 @@ xbar_ip_pow_dict = {'1': 1.37 * 2.0 - 1.04,
                     '7': 1.37 * 2.0 - 1.04,
                     '8': 1.37 * 2.0 - 1.04}
 
-xbar_rd_lat_dict = {'1': 328.0 * 1000 * (1 / 32.0),
-                    '2': 328.0 * 1000 * (1 / 32.0),
-                    '3': 328.0 * 1000 * (1 / 32.0),
-                    '4': 328.0 * 1000 * (1 / 32.0),
+xbar_rd_lat_dict = {'1': 328.0 * 1000 * (1 / 32.0) * 1,
+                    '2': 328.0 * 1000 * (1 / 32.0) * 2,
+                    '3': 328.0 * 1000 * (1 / 32.0) * 3,
+                    '4': 328.0 * 1000 * (1 / 32.0) * 400,
                     '5': 328.0 * 1000 * (1 / 32.0),
                     '6': 328.0 * 1000 * (1 / 32.0),
                     '7': 328.0 * 1000 * (1 / 32.0),
                     '8': 328.0 * 1000 * (1 / 32.0)}
 
-xbar_wr_lat_dict = {'1': 351.0 * 1000 * (1 / 32.0),
-                    '2': 351.0 * 1000 * (1 / 32.0),
-                    '3': 351.0 * 1000 * (1 / 32.0),
-                    '4': 351.0 * 1000 * (1 / 32.0),
+xbar_wr_lat_dict = {'1': 351.0 * 1000 * (1 / 32.0) * 1,
+                    '2': 351.0 * 1000 * (1 / 32.0) * 2,
+                    '3': 351.0 * 1000 * (1 / 32.0) * 3,
+                    '4': 351.0 * 1000 * (1 / 32.0) * 400,
                     '5': 351.0 * 1000 * (1 / 32.0),
                     '6': 351.0 * 1000 * (1 / 32.0),
                     '7': 351.0 * 1000 * (1 / 32.0),
@@ -464,7 +464,7 @@ dataMem_lat =  dataMem_lat_dict[str(cfg.dataMem_size)]
 
 # Chosen area based on config file - only for components whose area is parameter dependent
 if cfg.MVMU_ver == "Analog":
-        xbar_area = xbar_area_dict[str(cfg.xbar_bits)][str(cfg.xbar_size)]
+        xbar_area = xbar_area_dict['2'][str(cfg.xbar_size)]
 else:
         xbar_area = digi_param.Digital_xbar_area_dict[cfg.MVMU_ver][str(cfg.xbar_size)]
 dac_area = dac_area_dict [str(cfg.dac_res)]
