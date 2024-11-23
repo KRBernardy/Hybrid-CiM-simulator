@@ -150,7 +150,7 @@ class tile (object):
                     self.ima_list[idx].mem_interface.wen = 0
                     self.ima_list[idx].mem_interface.ramload = ramload
 
-            #### This case NEEDS FIXING!!
+            ####TODO This case NEEDS FIXING!!
             # check if access latency is 1 cycle - need to complete execute in this cycle
             elif (self.stage_cycle == self.latency):
                 # finish & free up edram controller
