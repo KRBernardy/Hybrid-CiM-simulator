@@ -246,7 +246,7 @@ class dac_array (object):
         # generate multiple dacs (one per xbar input)
         self.dac_list = []
         self.xbar_size = xbar_size
-        for i in xrange(xbar_size):
+        for i in range(xbar_size):
             temp_dac = dac (dac_res)
             self.dac_list.append(temp_dac)
 
@@ -256,7 +256,7 @@ class dac_array (object):
     def propagate (self, inp_list):
         assert (len(inp_list) == self.xbar_size), 'dac_array input list size mismatch'
         out_list = []
-        for i in xrange(self.xbar_size):
+        for i in range(self.xbar_size):
             temp_out = self.dac_list[i].propagate(inp_list[i])
             out_list.append(temp_out)
         return out_list
@@ -267,7 +267,7 @@ class dac_array (object):
 
         # just to keep track of individual dacs
         junk_list = []
-        for i in xrange(self.xbar_size):
+        for i in range(self.xbar_size):
             temp_out = self.dac_list[i].propagate(inp_list[i])
             junk_list.append(temp_out)
         # just to keep track of individual dacs
@@ -651,7 +651,7 @@ class xb_inMem (object):
     def read (self, num_bits):
         self.num_access_read += 1
         out_list = []
-        for i in xrange(self.xbar_size):
+        for i in range(self.xbar_size):
             value = self.memfile[i]
             #self.memfile[i] = '0'*num_bits + value[:-1*num_bits]
             self.memfile[i] = value[-1*num_bits:] + value[:-1*num_bits]
@@ -660,7 +660,7 @@ class xb_inMem (object):
 
     def read_all (self):
         out_list = []
-        for i in xrange(self.xbar_size):
+        for i in range(self.xbar_size):
             value = self.memfile[i]
             out_list.append(value)
         return out_list
@@ -719,7 +719,7 @@ class xb_outMem (xb_inMem):
         # Fix self.num_access_read ??
         #self.num_access_read += 1
         out_list = []
-        for i in xrange(self.xbar_size):
+        for i in range(self.xbar_size):
             value = self.memfile[i]
             out_list.append(value)
         return out_list
@@ -768,7 +768,7 @@ class instrn_memory (memory):
         if (len(dict_list) > self.size):
             print ('instruction memory size requirement', len(dict_list))
         assert (len(dict_list) <= self.size), 'instructions exceed the instruction memory size'
-        for i in xrange(len(dict_list)):
+        for i in range(len(dict_list)):
             self.memfile[i] = dict_list[i]
 
     def read (self, addr):

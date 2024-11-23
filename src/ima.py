@@ -42,7 +42,7 @@ class ima (object):
         self.xb_inMem_list = [] # list of dicts of xbar input memory
         self.xb_outMem_list = [] # list of dicts of xbar output memory
 
-        for i in xrange(cfg.num_matrix):
+        for i in range(cfg.num_matrix):
             # each matrix represents three mvmus - 1 mvmu for fw, 1 mvmu for bw, 1 mvmu (2X width) for delta
             temp_xbar_dict = {'f':[], 'b':[], 'd':[]}
             temp_inMem_dict = {'f':[], 'b':[], 'd':[]}
@@ -99,8 +99,8 @@ class ima (object):
         # num_adc is 2*num_matrix (no adc needed for delta xbar)
         # FIXME This is the option 1
         self.adc_list = []
-        for i in xrange(cfg.num_adc):
-        # for i in xrange(cfg.num_matrix):
+        for i in range(cfg.num_adc):
+        # for i in range(cfg.num_matrix):
             adc_key = 'matrix_adc_' + str(i)
 
             if adc_key in cfg.adc_res_new:
@@ -117,10 +117,11 @@ class ima (object):
         # Instantiate sample and hold
         self.snh_list_pos = []
         self.snh_list_neg = []
-        for i in xrange (2 * cfg.num_matrix * datacfg.ReRAM_xbar_num):
-            temp_snh = imod.sampleNhold (cfg.xbar_size)
-            self.snh_list_pos.append(temp_snh)
-            self.snh_list_neg.append(temp_snh)
+        for i in range (2 * cfg.num_matrix * datacfg.ReRAM_xbar_num):
+            temp_snh_pos = imod.sampleNhold (cfg.xbar_size)
+            temp_snh_neg = imod.sampleNhold (cfg.xbar_size)
+            self.snh_list_pos.append(temp_snh_pos)
+            self.snh_list_neg.append(temp_snh_neg)
 
         # Instatiate mux (num_mux depends on num_xbars and num_adcs)
         # The mux design (described below) will vary (xbar_size = 64):
@@ -133,7 +134,7 @@ class ima (object):
 
         self.mux1_list = [] # from xbar
         inp1_size = cfg.xbar_size
-        for i in xrange(2*cfg.num_matrix): # 2 for f and b xbar
+        for i in range(2*cfg.num_matrix): # 2 for f and b xbar
             temp_mux = imod.mux (inp1_size)
             self.mux1_list.append(temp_mux)
 
@@ -141,13 +142,13 @@ class ima (object):
         # intuition: delta xbar don't need additional adc. During crs, when delta xbar needs adc, f/b xbar's adc can be
         # used as f/b xbars won't be read then
         inp2_size = 2*cfg.num_matrix / cfg.num_adc # ratio of xbar (f+b) to adc, delta xbar don't need additional adc
-        for i in xrange(cfg.num_adc):
+        for i in range(cfg.num_adc):
             temp_mux = imod.mux (inp2_size)
             self.mux2_list.append(temp_mux)
 
         # Instantiate ALUs
         self.alu_list = []
-        for i in xrange(cfg.num_ALU):
+        for i in range(cfg.num_ALU):
             temp_alu = imod.alu ()
             self.alu_list.append(temp_alu)
 
@@ -614,8 +615,8 @@ class ima (object):
                                 sparsity = sparsity-10
 
                     ## Loop to cover all bits of inputs
-                    for k in xrange (int(math.ceil(cfg.input_prec / cfg.dac_res))): #quantization affects the # of streams
-                    #for k in xrange (1):
+                    for k in range (int(math.ceil(cfg.input_prec / cfg.dac_res))): #quantization affects the # of streams
+                    #for k in range (1):
                         # read the values from the xbar's input register
                         out_xb_inMem = self.xb_inMem_list[mat_id][key].read (cfg.dac_res)
                         
@@ -644,7 +645,7 @@ class ima (object):
                             out_snh_neg[m] = self.snh_list_neg[mat_id * datacfg.ReRAM_xbar_num + m].read()
 
                         # each of the xbar produce shifted bits of output (weight bits have been distributed)
-                        for j in xrange (cfg.xbar_size): # this 'for' across xbar outs to adc happens via mux
+                        for j in range (cfg.xbar_size): # this 'for' across xbar outs to adc happens via mux
                             out_sna = 0 # a zero for first sna
                             for m in range (datacfg.ReRAM_xbar_num):
                                 # convert from analog to digital
@@ -657,17 +658,16 @@ class ima (object):
                                 out_adc_neg = self.adc_list[adc_id].propagate(out_mux2, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc) # gets jth value in this mth xbar
 
                                 # shift and add outputs from difefrent wt_bits
-                                #[out_sna, ovf] = self.alu_list[0].propagate (out_sna, out_adc, alu_op, \
-                                #        m * cfg.xbar_bits)
                                 # NOTE here to deal with overflow, we use propagate_float. this should be fixed later
-                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc_pos, 'sna', datacfg.stored_bit[m], return_type = 'float')
-                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc_neg, 'sns', datacfg.stored_bit[m], return_type = 'float')
+                                [delta, ovf] = self.alu_list[0].propagate(out_adc_pos, out_adc_neg, 'sub', return_type = 'float')
+                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, delta, 'sna', datacfg.stored_bit[m], return_type = 'float')
 
                             
                             # read from xbar's output register
                             out_xb_outMem = self.xb_outMem_list[mat_id][key].read (j)
                             # shift and add - make a dedicated sna unit -- PENDING
-                            [out_sna, ovf] = self.alu_list[0].propagate(out_xb_outMem, out_sna, 'sna', k * cfg.dac_res)
+                            [out_sna, ovf] = self.alu_list[0].propagate(out_xb_outMem, out_sna, 'sna', k * cfg.dac_res - datacfg.frac_bits)
+
                             if (cfg.debug and ovf):
                                 fid.write ('IMA: ' + str(self.ima_id) + ' ALU Overflow Exception ' +\
                                         self.de_aluop + ' allowed to run')
@@ -686,7 +686,7 @@ class ima (object):
                     out_xb_outMem = self.xb_outMem_list[mat_id][key].read_p() # read entire xb_outMem
 
                     # Loop to cover all bits of inputs - bit-streamed inputs across rows
-                    for j in xrange (cfg.xbdata_width/cfg.dac_res):
+                    for j in range (cfg.xbdata_width/cfg.dac_res):
 
                         # read the fw-activations to provide inputs across the rows
                         out_xb_inMem = self.xb_inMem_list[mat_id][key].read (cfg.dac_res)
@@ -698,7 +698,7 @@ class ima (object):
                         # do outer product on all physical xbars (for a logical xbar)
                         # Note: 2X delta xbars than fw/bw xbars
                         num_xb = (2*cfg.data_width) / cfg.xbar_bits
-                        for m in xrange (num_xb):
+                        for m in range (num_xb):
                             out_dac1 = self.dacArray_list[mat_id]['d_r'].propagate (out_xb_inMem)
                             if (m == 0):
                                 temp = [val[-((m+1)*cfg.xbar_bits):] for val in out_xb_outMem_temp]
@@ -710,7 +710,7 @@ class ima (object):
 
                 ## Traverse through the matrices in a core
                 if (cfg.training):
-                    for i in xrange (cfg.num_matrix):
+                    for i in range (cfg.num_matrix):
                     # traverse through f/b/d mvmu(s) for the matrix and execute if applicable
                         mask_temp = self.de_xb_nma[i]
                         if (mask_temp[0] == '1'):
@@ -725,7 +725,7 @@ class ima (object):
                             outer_product (i, 'd')
 
                 if (cfg.inference):
-                   for i in xrange(cfg.num_matrix):
+                   for i in range(cfg.num_matrix):
                        if self.de_xb_nma[i]:
                            print ("ima_id: " +str(self.ima_id) + " mat_id: "  +str(i) + " MVM")
                            inner_product(i,'f')
@@ -841,7 +841,7 @@ class ima (object):
         def xbComputeLatency_Digital (self):
             mvm_lat_temp = 0
             if (cfg.inference):
-                for p in xrange(cfg.num_matrix):
+                for p in range(cfg.num_matrix):
                     if self.de_xb_nma[p]:
                         sparsity=0
                         if cfg.sparse_opt:
