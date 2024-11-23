@@ -12,7 +12,7 @@ import include.constants as param
 def bin2conductance(binary_string, bits):
     assert (len(binary_string) == bits), 'length of input binary string should be same with bits'
     level = int(binary_string, 2)
-    step = float((param.xbar_conductance_max - param.xbar_conductance_min)) / bits
+    step = float((param.xbar_conductance_max - param.xbar_conductance_min)) / (2 ** bits - 1)
     return param.xbar_conductance_min + (level * step)
 
 # this function is used to convert a bin to its 2s compliment
