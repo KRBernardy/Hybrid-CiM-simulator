@@ -49,9 +49,9 @@ for i in os.listdir(THIS_PATH):
 ## for use in np.dot (to store bits representation, use fixed point version of np.dot)
             for i in range (xbar_size):
                 for j in range (xbar_size):
-                    nagitive = False # mark if we are storing a negative number, positive and negative are stored separately
+                    negative = False # mark if we are storing a negative number, positive and negative are stored separately
                     if log_xbar[i][j] < 0:
-                        nagitive = True
+                        negative = True
                         temp_val = float2fixed(-1 * log_xbar[i][j], datacfg.int_bits, datacfg.frac_bits)
                     else:
                         temp_val = float2fixed(log_xbar[i][j], datacfg.int_bits, datacfg.frac_bits)
@@ -67,7 +67,7 @@ for i in os.listdir(THIS_PATH):
 
                         # we storage negative resistance values here.
                         # when programing to xbar it will be separated to a positive xbar and a negative xbar
-                        if nagitive:
+                        if negative:
                             phy_xbar[k][i][j] = -1 * bin2conductance(val, datacfg.bits_per_cell[k])
                         else:
                             phy_xbar[k][i][j] = bin2conductance(val, datacfg.bits_per_cell[k])
