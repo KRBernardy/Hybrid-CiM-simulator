@@ -44,9 +44,17 @@ num_matrix = 6 # each matrix is 1-fw logical xbar for inference and 1-fw, 1-bw, 
 xbar_size = 128
 dac_res = 1
 # ADC configuration
-adc_res = 8 # around 4 to 8. this value should be
-num_adc_per_matrix = 2
-num_adc = num_adc_per_matrix * num_matrix
+adc_res = 8 # this value should be around 4 to 8.
+adc_type = 'normal' # 'normal' or 'differential'
+# num_column_per_adc is number of xbar columns per adc. Notice that a positive column next to a negative column is considered as one column here.
+# Needs to make sure that xbar_size is multiple of num_column_per_adc. Recommanded value is 16 for normal ADC and 8 for differential ADC ().
+num_column_per_adc = 16
+
+num_mux_per_xbar = xbar_size // num_column_per_adc * 2 # number of MUXs per xbar, for both positive and negative
+num_mux = num_matrix * 2 * datacfg.ReRAM_xbar_num * num_mux_per_xbar # number of MUXs in total
+
+num_adc_per_xbar = num_mux_per_xbar if adc_type == 'normal' else num_mux_per_xbar / 2 # differential ADC has half the number of muxes
+num_adc = num_matrix * 2 * datacfg.ReRAM_xbar_num * num_adc_per_xbar # number of ADCs in total
 
 # The idea is to have different ADC resolution value for each ADC.
 # The number of ADC if defined by num_adc property. Currently it is 2 * num_matrix(2) = 4

@@ -11,7 +11,7 @@ infinity = 100000
 #############################################################################################################
 # IMA - folliwng parameters are not used currently, will be used when analog functionality is implemented
 cycle_time = 1 # in nanoseconds (1ns)
-vdd = 0.9
+vdd = 1.0
 xbar_conductance_min = 0.0
 xbar_conductance_max = 1.0 # think about this - ???
 
@@ -273,6 +273,50 @@ adc_area_dict = {'1' : 0.0012,
 		 '9' : 0.0012,
                  '16': 0.0012}
 
+diff_adc_lat_dict = {'1' : 12.5,
+                '2' : 25,
+                '3' : 37.5,
+                '4' : 50,
+                '5' : 62.5,
+                '6' : 75,
+                '7' : 87.5,
+                '8' : 100,
+		'9' : 112.5,
+                '16': 200}
+
+diff_adc_pow_dyn_dict = {'1' : 0.225,
+                    '2' : 0.45,
+                    '3' : 0.675,
+                    '4' : 0.9,
+                    '5' : 1.125,
+                    '6' : 1.35,
+                    '7' : 1.575,
+                    '8' : 1.8,
+		    '9' : 2.025,
+                    '16': 3.6}
+
+diff_adc_pow_leak_dict = {'1' : 0.025,
+                     '2' : 0.05,
+                     '3' : 0.075,
+                     '4' : 0.1,
+                     '5' : 0.125,
+                     '6' : 0.15,
+                     '7' : 0.175,
+                     '8' : 0.2,
+		     '9' : 0.225,
+                     '16': 0.4}
+
+diff_adc_area_dict = {'1' : 0.0012,
+                 '2' : 0.0012,
+                 '3' : 0.0012,
+                 '4' : 0.0012,
+                 '5' : 0.0012,
+                 '6' : 0.0012,
+                 '7' : 0.0012,
+                 '8' : 0.0012,
+		 '9' : 0.0012,
+                 '16': 0.0012}
+
 # SNH (MVM pipeline)
 snh_lat = 1
 snh_pow_leak = 9.7 * 10**(-7)
@@ -456,7 +500,7 @@ xbar_wr_lat = xbar_wr_lat
 '''
 dac_lat = dac_lat_dict [str(cfg.dac_res)]
 #FIXME need to review it I can remove adc_lat property
-adc_lat = adc_lat_dict [str(cfg.adc_res)]
+adc_lat = adc_lat_dict [str(cfg.adc_res)] if cfg.adc_type == 'normal' else diff_adc_lat_dict[str(cfg.adc_res)]
 xbar_inMem_lat = xbar_inMem_lat_dict[str(cfg.xbar_size)]
 xbar_outMem_lat = xbar_outMem_lat_dict[str(cfg.xbar_size)]
 instrnMem_lat =  instrnMem_lat_dict[str(cfg.instrnMem_size)]
@@ -468,7 +512,7 @@ if cfg.MVMU_ver == "Analog":
 else:
         xbar_area = digi_param.Digital_xbar_area_dict[cfg.MVMU_ver][str(cfg.xbar_size)]
 dac_area = dac_area_dict [str(cfg.dac_res)]
-adc_area = adc_area_dict [str(cfg.adc_res)]
+adc_area = adc_area_dict [str(cfg.adc_res)] if cfg.adc_type == 'normal' else diff_adc_area_dict[str(cfg.adc_res)]
 xbar_inMem_area = xbar_inMem_area_dict[str(cfg.xbar_size)]
 xbar_outMem_area = xbar_outMem_area_dict[str(cfg.xbar_size)]
 instrnMem_area =  instrnMem_area_dict[str(cfg.instrnMem_size)] * math.sqrt(8) #area scaling for 8 bytes per instruction
@@ -481,7 +525,7 @@ xbar_op_pow_dyn_dict = xbar_op_pow_dict
 xbar_rd_pow_dyn_dict = xbar_rd_pow_dict
 xbar_wr_pow_dyn_dict = xbar_wr_pow_dict
 dac_pow_dyn = dac_pow_dyn_dict [str(cfg.dac_res)]
-adc_pow_dyn = adc_pow_dyn_dict [str(cfg.adc_res)]
+adc_pow_dyn = adc_pow_dyn_dict [str(cfg.adc_res)] if cfg.adc_type == 'normal' else diff_adc_pow_dyn_dict[str(cfg.adc_res)]
 xbar_inMem_pow_dyn_read = xbar_inMem_pow_dyn_read_dict[str(cfg.xbar_size)]
 xbar_inMem_pow_dyn_write = xbar_inMem_pow_dyn_write_dict[str(cfg.xbar_size)]
 xbar_outMem_pow_dyn = xbar_outMem_pow_dyn_dict[str(cfg.xbar_size)]
@@ -506,7 +550,7 @@ if cfg.MVMU_ver == "Analog":
 else:
         xbar_pow_leak = digi_param.Digital_xbar_pow_leak_dict[str(cfg.xbar_size)]
 dac_pow_leak = dac_pow_leak_dict [str(cfg.dac_res)]
-adc_pow_leak = adc_pow_leak_dict [str(cfg.adc_res)]
+adc_pow_leak = adc_pow_leak_dict [str(cfg.adc_res)] if cfg.adc_type == 'normal' else diff_adc_pow_leak_dict[str(cfg.adc_res)]
 xbar_inMem_pow_leak = xbar_inMem_pow_leak_dict[str(cfg.xbar_size)]
 xbar_outMem_pow_leak = xbar_outMem_pow_leak_dict[str(cfg.xbar_size)]
 instrnMem_pow_leak =  instrnMem_pow_leak_dict[str(cfg.instrnMem_size)] * math.sqrt(8) #area scaling for 8 bytes per instruction

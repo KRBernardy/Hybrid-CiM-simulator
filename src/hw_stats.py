@@ -21,7 +21,7 @@ hw_comp_energy = {'xbar_mvm':{}, \
         'xbar_rd': {}, \
         'xbar_wr': {},
         'dac':param.dac_pow_dyn, 'snh':param.snh_pow_dyn, \
-        'mux1':param.mux_pow_dyn, 'mux2':param.mux_pow_dyn, \
+        'mux':param.mux_pow_dyn, \
         'adc':{ 'n' :    param.adc_pow_dyn_dict[str(cfg.adc_res)]   if cfg.adc_res>0   else 0, \
                 'n/2':   param.adc_pow_dyn_dict[str(cfg.adc_res-1)] if cfg.adc_res-1>0 else 0, \
                 'n/4':   param.adc_pow_dyn_dict[str(cfg.adc_res-2)] if cfg.adc_res-2>0 else 0, \
@@ -64,7 +64,7 @@ def get_hw_stats (fid, node_dut, cycle):
             'xbar_rd': {}, \
             'xbar_wr': {}, \
             'dac':0, 'snh':0, \
-            'mux1':0, 'mux2':0, 'adc':{ 'n' :    0, \
+            'mux':0, 'adc':{ 'n' :    0, \
                                         'n/2':   0, \
                                         'n/4':   0, \
                                         'n/8':   0, \
@@ -174,16 +174,26 @@ def get_hw_stats (fid, node_dut, cycle):
                     hw_comp_access['snh'] += (node_dut.tile_list[i].ima_list[j].snh_list_neg[k].num_access * cfg.xbar_size) # each snh is
                     # basically an array of multiple snhs (individual power in constants file must be for one discerete snh)
 
-            for k in range (2*cfg.num_matrix):
-                hw_comp_access['mux1'] += node_dut.tile_list[i].ima_list[j].mux1_list[k].num_access
-
-            for k in range (cfg.num_adc):
-                hw_comp_access['mux2'] += node_dut.tile_list[i].ima_list[j].mux1_list[k].num_access
+            for mat_id in range(cfg.num_matrix):
+                for key in ['f', 'b']:
+                    for xbar_id in range(datacfg.ReRAM_xbar_num):
+                        for mux_id in range(cfg.num_mux_per_xbar / 2): # positive and negative muxes share the same mux_id
+                            for pos_neg in ['pos', 'neg']:
+                                hw_comp_access['mux'] += node_dut.tile_list[i].ima_list[j].mux_list[mat_id][key][xbar_id][mux_id][pos_neg].num_access
 
             if cfg.MVMU_ver == "Analog":
-                for k in range (cfg.num_adc):
-                    for key,value in hw_comp_access['adc'].items():
-                        hw_comp_access['adc'][key] += node_dut.tile_list[i].ima_list[j].adc_list[k].num_access[key]
+                for mat_id in range(cfg.num_matrix):
+                    for key in ['f', 'b']:
+                        for xbar_id in range(datacfg.ReRAM_xbar_num):
+                            if cfg.adc_type == 'normal':
+                                for adc_id in range(cfg.num_adc_per_xbar / 2): # positive and negative adcs share the same adc_id
+                                    for key1, value in hw_comp_access['adc'].items():
+                                        hw_comp_access['adc'][key1] += node_dut.tile_list[i].ima_list[j].adc_list[mat_id][key][xbar_id][adc_id]['pos'].num_access[key1]
+                                        hw_comp_access['adc'][key1] += node_dut.tile_list[i].ima_list[j].adc_list[mat_id][key][xbar_id][adc_id]['neg'].num_access[key1]
+                            elif cfg.adc_type == 'differential':
+                                for adc_id in range(cfg.num_adc_per_xbar):
+                                    for key1, value in hw_comp_access['adc'].items():
+                                        hw_comp_access['adc'][key1] += node_dut.tile_list[i].ima_list[j].adc_list[mat_id][key][xbar_id][adc_id].num_access[key1]
 
             for k in range (cfg.num_ALU):
                 hw_comp_access['alu_div'] += node_dut.tile_list[i].ima_list[j].alu_list[k].num_access_div + \

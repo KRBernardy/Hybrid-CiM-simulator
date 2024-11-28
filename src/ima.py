@@ -102,23 +102,27 @@ class ima (object):
             self.dacArray_list.append(temp_dict)
 
         # Instatiate ADCs
-        # num_adc is 2*num_matrix (no adc needed for delta xbar)
-        # FIXME This is the option 1
+        # No ADC needed for delta xbar, so key is f,b
+        # When using normal ADC, list will be in form of [matrix_id][key][xbar_id][adc_id][pos/neg]
+        # When using differential ADC, list will be in form of [matrix_id][key][xbar_id][adc_id]
         self.adc_list = []
-        for i in range(cfg.num_adc):
-        # for i in range(cfg.num_matrix):
-            adc_key = 'matrix_adc_' + str(i)
-
-            if adc_key in cfg.adc_res_new:
-                adc_res = cfg.adc_res_new[adc_key]
-            else:
-                adc_res = cfg.adc_res
-
-            print("adc_key",adc_key)
-            print("adc_res",adc_res)
-
-            temp_adc = imod.adc (adc_res)
-            self.adc_list.append(temp_adc)
+        self.adc_type = cfg.adc_type
+        adc_per_xbar = cfg.xbar_size / cfg.num_column_per_adc
+        for mat_id in range(cfg.num_matrix):
+            self.adc_list.append({})
+            for key in ['f', 'b']:
+                self.adc_list[mat_id][key] = []
+                for xbar_id in range(datacfg.ReRAM_xbar_num):
+                    self.adc_list[mat_id][key].append([])
+                    for adc_id in range(adc_per_xbar):
+                        if cfg.adc_type == 'normal': # two normal ADCs will be needed here, one for positive and one for negative
+                            self.adc_list[mat_id][key][xbar_id].append({})
+                            for pos_neg in ['pos', 'neg']:
+                                temp_adc = imod.adc (cfg.adc_res)
+                                self.adc_list[mat_id][key][xbar_id][adc_id][pos_neg] = temp_adc
+                        elif cfg.adc_type == 'differential':
+                            temp_adc = imod.differential_adc (cfg.adc_res)
+                            self.adc_list[mat_id][key][xbar_id].append(temp_adc)
 
         # Instantiate sample and hold
         self.snh_list_pos = []
@@ -129,28 +133,21 @@ class ima (object):
             self.snh_list_pos.append(temp_snh_pos)
             self.snh_list_neg.append(temp_snh_neg)
 
-        # Instatiate mux (num_mux depends on num_xbars and num_adcs)
-        # The mux design (described below) will vary (xbar_size = 64):
-        # For 2 xbars with 1 ADC : Two 64-1 mux and One 2-1 mux
-        # For 2 xbars with 2 ADCs: Two 64-1 mux
-        # Similarly, 8 xbars & 1 ADC: Eight 64-1 mux and One 8-1 mux
-        # *** Number of "xbar_size" muxes = num_xbar ***
-        # *** Number of "(num_xbar/num_adc)" muxes = num_adcs ***
-        # A mux with inp_size = 1 is basically a dammy mux (wire)
-
-        self.mux1_list = [] # from xbar
-        inp1_size = cfg.xbar_size
-        for i in range(2*cfg.num_matrix): # 2 for f and b xbar
-            temp_mux = imod.mux (inp1_size)
-            self.mux1_list.append(temp_mux)
-
-        self.mux2_list = [] # to adc
-        # intuition: delta xbar don't need additional adc. During crs, when delta xbar needs adc, f/b xbar's adc can be
-        # used as f/b xbars won't be read then
-        inp2_size = 2*cfg.num_matrix / cfg.num_adc # ratio of xbar (f+b) to adc, delta xbar don't need additional adc
-        for i in range(cfg.num_adc):
-            temp_mux = imod.mux (inp2_size)
-            self.mux2_list.append(temp_mux)
+        # Instatiate MUX
+        # MUX list will be in form of [matrix_id][key][xbar_id][mux_id][pos/neg]
+        self.mux_list = []
+        mux_per_xbar = cfg.xbar_size / cfg.num_column_per_adc
+        for mat_id in range(cfg.num_matrix):
+            self.mux_list.append({})
+            for key in ['f', 'b']:
+                self.mux_list[mat_id][key] = []
+                for xbar_id in range(datacfg.ReRAM_xbar_num):
+                    self.mux_list[mat_id][key].append([])
+                    for mux_id in range(mux_per_xbar):
+                        self.mux_list[mat_id][key][xbar_id].append({})
+                        for pos_neg in ['pos', 'neg']:
+                            temp_mux = imod.mux (cfg.num_column_per_adc)
+                            self.mux_list[mat_id][key][xbar_id][mux_id][pos_neg] = temp_mux
 
         # Instantiate ALUs
         self.alu_list = []
@@ -662,25 +659,30 @@ class ima (object):
                             out_sna = 0 # a zero for first sna
                             for m in range (datacfg.ReRAM_xbar_num):
                                 # convert from analog to digital
-                                adc_id = (mat_id * datacfg.ReRAM_xbar_num + m) % cfg.num_adc
-                                out_mux_pos = self.mux1_list[mat_id].propagate(out_snh_pos[m], j) # i is the ith xbar
-                                out_mux_pos = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux_pos) #dummy for directly getting input out, used to simplify the code
-                                out_adc_pos = self.adc_list[adc_id].propagate(out_mux_pos, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc) # gets jth value in this mth xbar
-                                out_mux_neg = self.mux1_list[mat_id].propagate(out_snh_neg[m], j) # i is the ith xbar
-                                out_mux_neg = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux_neg) #dummy for directly getting input out, used to simplify the code
-                                out_adc_neg = self.adc_list[adc_id].propagate(out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc) # gets jth value in this mth xbar
+                                adc_id = j // cfg.num_column_per_adc
+                                out_mux_pos = self.mux_list[mat_id][key][m][adc_id]['pos'].propagate(out_snh_pos[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
+                                out_mux_neg = self.mux_list[mat_id][key][m][adc_id]['neg'].propagate(out_snh_neg[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
 
-                                # shift and add outputs from difefrent wt_bits
-                                # NOTE here to deal with overflow, we use propagate_float. this should be fixed later
-                                [delta, ovf] = self.alu_list[0].propagate(out_adc_pos, out_adc_neg, 'sub', return_type = 'float')
+                                out_adc = '0' * cfg.adc_res
+                                if self.adc_type == 'normal':
+                                    out_adc_pos = self.adc_list[mat_id][key][m][adc_id]['pos'].propagate(out_mux_pos, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc)
+                                    out_adc_neg = self.adc_list[mat_id][key][m][adc_id]['neg'].propagate(out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc)
+                                    # NOTE here to deal with overflow, we use propagate_float. this should be fixed later
+                                    [out_adc, ovf] = self.alu_list[0].propagate(out_adc_pos, out_adc_neg, 'sub', return_type = 'float')
+                                elif self.adc_type == 'differential':
+                                    out_adc = self.adc_list[mat_id][key][m][adc_id].propagate(out_mux_pos, out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc)
+                                    out_adc = bin2int(out_adc, cfg.adc_res)
 
                                 if tracking_this and (j == track_addr):
                                     print("xbar ID: %d, digit: %d" % (m, k + 1))
                                     print("out_mux_pos: %f, out_mux_neg: %f" % (out_mux_pos, out_mux_neg))
-                                    print("out_adc_pos: %d, out_adc_neg: %d" % (bin2int(out_adc_pos, 8), bin2int(out_adc_neg, 8)))
-                                    print("delta: %f" % delta)
+                                    if self.adc_type == 'normal':
+                                        print("out_adc_pos: %d, out_adc_neg: %d" % (bin2int(out_adc_pos, 8), bin2int(out_adc_neg, 8)))
+                                    print("out_adc: %f" % out_adc)
                                     print("value before sna: %f" % out_sna)
-                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, delta, 'sna', datacfg.stored_bit[m], return_type = 'float')
+
+                                # Do the shift and add for mth xbar
+                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc, 'sna', datacfg.stored_bit[m], return_type = 'float')
 
                                 if tracking_this and (j == track_addr):
                                     print("value after sna: %f" % out_sna)
@@ -835,8 +837,11 @@ class ima (object):
                 #lat_temp = self.matrix_list[0]['f'][0].getIpLatency() # due to xbar access
                 lat_temp = 0
                 # We assume all ADCs in a matrix has the same resolution
-                adc_idx = idx*cfg.num_adc_per_matrix
-                lat_temp = self.adc_list[adc_idx].getLatency()
+                #adc_idx = idx*cfg.num_adc_per_matrix
+                if cfg.adc_type == 'normal':
+                    lat_temp = self.adc_list[0]['f'][0][0]['pos'].getLatency()
+                elif cfg.adc_type == 'differential':
+                    lat_temp = self.adc_list[0]['f'][0][0].getLatency()
                 '''
                 print("adc_idx", adc_idx)
                 print("lat_temp", lat_temp)

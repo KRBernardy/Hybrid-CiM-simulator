@@ -372,6 +372,72 @@ class adc (object):
             self.adc_res = 1
 
         return inp
+    
+class differential_adc (object):
+    def __init__ (self, adc_res):
+        # define num_access
+        self.num_access = { 'n':0, 'n/2': 0,'n/4': 0,'n/8': 0,'n/16': 0,'n/32': 0,'n/64': 0,'n/128': 0}
+        
+        # define latency
+        self.latency = param.diff_adc_lat_dict[str(adc_res)]
+
+        self.adc_res = adc_res
+
+    def getLatency (self):
+        self.latency = param.diff_adc_lat_dict[str(self.adc_res)]
+        return self.latency
+
+    def real2bin (self, inp_pos, inp_neg, num_bits, bits_per_cell = 2, dac_res = cfg.dac_res):
+        num_levels = 2**num_bits
+        conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
+        voltage_step = param.vdd / ((2 ** dac_res) - 1)
+        current_step = voltage_step * conductance_step
+        int_value = int(float(inp_pos - inp_neg) / float(current_step))
+        try:
+            assert(abs(int_value) < num_levels)
+        except AssertionError:
+            print("ADC overflow")
+            print("int_value: ", int_value)
+            print("num_levels: ", num_levels)
+            sys.exit(1)
+        bin_value = bin(abs(int_value))[2:]
+        bin_value = ('0' * (num_bits - len(bin_value)) + bin_value)
+        if int_value < 0:
+            bin_value = twos_complement(bin_value)
+        return bin_value
+
+    # Here we allow the adc to deal with negative inputs
+    # in real circult it should calculate twice, first time for all positive value
+    def propagate (self, inp_pos, inp_neg, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0):
+        if sparsity<50:
+            self.num_access['n'] += 1
+            self.adc_res = cfg.adc_res
+        elif sparsity<75:
+            self.num_access['n/2'] += 1
+            self.adc_res = cfg.adc_res-1
+        elif sparsity<87.5:
+            self.num_access['n/4'] += 1
+            self.adc_res = cfg.adc_res-2
+        elif sparsity<93.75:
+            self.num_access['n/8'] += 1
+            self.adc_res = cfg.adc_res-3
+        elif sparsity<96.875:
+            self.num_access['n/16'] += 1
+            self.adc_res = cfg.adc_res-4
+        elif sparsity<98.4375:
+            self.num_access['n/32'] += 1
+            self.adc_res = cfg.adc_res-5
+        elif sparsity<99.21875:
+            self.num_access['n/64'] += 1
+            self.adc_res = cfg.adc_res-6
+        else:
+            self.num_access['n/128'] += 1
+            self.adc_res = cfg.adc_res-7
+        if(self.adc_res<=0):
+            self.adc_res = 1
+        assert (type(inp_pos), type(inp_neg) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
+        num_bits = self.adc_res
+        return self.real2bin (inp_pos, inp_neg, num_bits, bits_per_cell, dac_res)
 
 # Doesn't replicate the exact (sample and hold) functionality (just does hold)
 class sampleNhold (object):

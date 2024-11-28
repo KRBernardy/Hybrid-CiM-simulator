@@ -17,11 +17,19 @@ def bin2conductance(binary_string, bits):
 
 # this function is used to convert a bin to its 2s compliment
 
-def compliment(binary_string, bits):
-    assert(len(binary_string) == bits), 'length of input binary string should be same with bits'
-    inp = int(binary_string, 2)
-    inp += 1
-    return bin(inp)[2:]
+def twos_complement(binary_string):
+    # Ensure the input is a valid binary string
+    if not all(bit in '01' for bit in binary_string):
+        raise ValueError("Input should be a binary string")
+
+    # Invert the bits
+    inverted_bits = ''.join('1' if bit == '0' else '0' for bit in binary_string)
+
+    # Convert to integer, add 1, and convert back to binary
+    twos_complement_value = bin(int(inverted_bits, 2) + 1)[2:]
+
+    # Ensure the result has the same length as the input
+    return twos_complement_value.zfill(len(binary_string))
 
 
 def bin2int (binary_string, bits, compliment = True):

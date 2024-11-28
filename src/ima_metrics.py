@@ -41,7 +41,7 @@ def compute_pow_leak ():
     if cfg.MVMU_ver == "Analog":
         leak_pow += (cfg.num_matrix * (3 + datacfg.ReRAM_xbar_num)) * cfg.xbar_size * param.dac_pow_leak # dac
         leak_pow += (cfg.num_matrix * 2 * 2 * datacfg.ReRAM_xbar_num) * cfg.xbar_size * param.snh_pow_leak # snh
-        leak_pow += cfg.num_adc * param.adc_pow_leak # adc
+        leak_pow += cfg.num_adc * param.adc_pow_leak
         leak_pow += (cfg.num_matrix * 2) * param.sna_pow_leak # sna
         leak_pow += (cfg.num_matrix * 3) * param.xbar_outMem_pow_leak # xbar_outMem
         leak_pow += (cfg.num_matrix * 4) * datacfg.ReRAM_xbar_num * param.xbar_pow_leak # xbar power fr analog
