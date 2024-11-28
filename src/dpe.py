@@ -159,7 +159,19 @@ class DPE:
         start = time.time()
         while (not node_dut.node_halt and cycle < cfg.cycles_max):
             node_dut.node_run(cycle)
+            '''
+            if (cfg.debug):
+                tracedir_cycle = self.tracepath + str(cycle)
+                if not os.path.exists(tracedir_cycle):
+                    os.makedirs(tracedir_cycle)
+                for i in range(cfg.num_tile):
+                    temp_tiledir = tracedir_cycle + '/tile' + str(i)
+                    if not os.path.exists(temp_tiledir):
+                        os.makedirs(temp_tiledir)
+                node_dump(node_dut, tracedir_cycle + '/')
+            '''
             cycle = cycle + 1
+            
 
         end = time.time()
         print ('simulation time: ' + str(end-start) + 'secs')

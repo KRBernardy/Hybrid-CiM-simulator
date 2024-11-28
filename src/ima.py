@@ -20,6 +20,12 @@ from data_convert import *
 datamem_off = cfg.datamem_off # each matrix has 6 memory spaces (1 for f/b, 2 for d)
 my_xbar_count = 0
 
+# This is a debug feature which allows tracking one particular value
+tracking = False # set to True to track a particular value
+track_mat_id = 0 # matrix id to track
+track_type = 'f' # type of xbar to track (f/b/d)
+track_addr = 11 # address in xbar to track(0-127)
+
 class ima (object):
 
     instances_created = 0
@@ -595,6 +601,13 @@ class ima (object):
                 # representation for positive and negative numbers
 
                 def inner_product (mat_id, key):
+                    # test if this is the tracking xbar
+                    tracking_this = False
+                    if tracking and (mat_id == track_mat_id) and (key == track_type):
+                        print("Tracking matrix %s, %d, addr = %d" % (key, mat_id, track_addr))
+                        print('')
+                        tracking_this = True
+                    
                     # reset the xb out memory before starting to accumulate
                     self.xb_outMem_list[mat_id][key].reset ()
 
@@ -650,24 +663,38 @@ class ima (object):
                             for m in range (datacfg.ReRAM_xbar_num):
                                 # convert from analog to digital
                                 adc_id = (mat_id * datacfg.ReRAM_xbar_num + m) % cfg.num_adc
-                                out_mux1 = self.mux1_list[mat_id].propagate(out_snh_pos[m], j) # i is the ith xbar
-                                out_mux2 = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux1) #dummy for directly getting input out, used to simplify the code
-                                out_adc_pos = self.adc_list[adc_id].propagate(out_mux2, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc) # gets jth value in this mth xbar
-                                out_mux1 = self.mux1_list[mat_id].propagate(out_snh_neg[m], j) # i is the ith xbar
-                                out_mux2 = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux1) #dummy for directly getting input out, used to simplify the code
-                                out_adc_neg = self.adc_list[adc_id].propagate(out_mux2, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc) # gets jth value in this mth xbar
+                                out_mux_pos = self.mux1_list[mat_id].propagate(out_snh_pos[m], j) # i is the ith xbar
+                                out_mux_pos = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux_pos) #dummy for directly getting input out, used to simplify the code
+                                out_adc_pos = self.adc_list[adc_id].propagate(out_mux_pos, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc) # gets jth value in this mth xbar
+                                out_mux_neg = self.mux1_list[mat_id].propagate(out_snh_neg[m], j) # i is the ith xbar
+                                out_mux_neg = self.mux2_list[mat_id % cfg.num_adc].propagate_dummy(out_mux_neg) #dummy for directly getting input out, used to simplify the code
+                                out_adc_neg = self.adc_list[adc_id].propagate(out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc) # gets jth value in this mth xbar
 
                                 # shift and add outputs from difefrent wt_bits
                                 # NOTE here to deal with overflow, we use propagate_float. this should be fixed later
                                 [delta, ovf] = self.alu_list[0].propagate(out_adc_pos, out_adc_neg, 'sub', return_type = 'float')
+
+                                if tracking_this and (j == track_addr):
+                                    print("xbar ID: %d, digit: %d" % (m, k + 1))
+                                    print("out_mux_pos: %f, out_mux_neg: %f" % (out_mux_pos, out_mux_neg))
+                                    print("out_adc_pos: %d, out_adc_neg: %d" % (bin2int(out_adc_pos, 8), bin2int(out_adc_neg, 8)))
+                                    print("delta: %f" % delta)
+                                    print("value before sna: %f" % out_sna)
                                 [out_sna, ovf] = self.alu_list[0].propagate(out_sna, delta, 'sna', datacfg.stored_bit[m], return_type = 'float')
 
-                            
+                                if tracking_this and (j == track_addr):
+                                    print("value after sna: %f" % out_sna)
+                                    print('')
+
                             # read from xbar's output register
                             out_xb_outMem = self.xb_outMem_list[mat_id][key].read (j)
                             # shift and add - make a dedicated sna unit -- PENDING
                             [out_sna, ovf] = self.alu_list[0].propagate(out_xb_outMem, out_sna, 'sna', k * cfg.dac_res - datacfg.frac_bits)
 
+                            if tracking_this and (j == track_addr):
+                                print("before this digit: %f" % fixed2float(out_xb_outMem, datacfg.int_bits, datacfg.frac_bits))
+                                print("after this digit: %f" % fixed2float(out_sna, datacfg.int_bits, datacfg.frac_bits))
+                                print('')
                             if (cfg.debug and ovf):
                                 fid.write ('IMA: ' + str(self.ima_id) + ' ALU Overflow Exception ' +\
                                         self.de_aluop + ' allowed to run')

@@ -71,8 +71,10 @@ class xbar (object):
                 for j in range(self.xbar_size):
                     if xbar_value[i][j] > 0:
                         self.xbar_value_pos[i][j] = xbar_value[i][j]
+                        self.xbar_value_neg[i][j] = 0
                     else:
                         self.xbar_value_neg[i][j] = -1 * xbar_value[i][j]
+                        self.xbar_value_pos[i][j] = 0
 
     # writes to a location on xbar
     def write (self, k, l, value):
@@ -297,7 +299,13 @@ class adc (object):
         voltage_step = param.vdd / ((2 ** dac_res) - 1)
         current_step = voltage_step * conductance_step
         int_value = int(float(inp) / float(current_step))
-        assert(int_value < num_levels), 'adc overflow'
+        try:
+            assert(int_value < num_levels)
+        except AssertionError:
+            print("ADC overflow")
+            print("int_value: ", int_value)
+            print("num_levels: ", num_levels)
+            sys.exit(1)
         bin_value = bin(int_value)[2:]
         return ('0'*(num_bits - len(bin_value)) + bin_value)
 
