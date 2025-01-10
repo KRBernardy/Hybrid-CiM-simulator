@@ -65,7 +65,7 @@ last_stage = 'ex'
 # IMA component latency/power/area dictionary (all values in ns, mw, mm2)
 
 #ReRAM accuracy degradtion. Use ReRAM_read_sigma = 0 for no degradtion
-ReRAM_read_sigma = 0
+ReRAM_read_sigma = 0.01
 
 # XBAR - Models from ISAAC paper
 xbar_lat_dict = {'2': {'32' : 32,   # first indexed by xbar_bits then by xbar_size
@@ -412,26 +412,42 @@ instrnMem_lat_dict = {'512' : 1,
                       '1024': 1,
                       '2048': 1,
 		      '4096': 1,
-		      '8192': 1}
+		      '8192': 1,
+                      '16384': 1,
+                      '32768': 1,
+                      '65536': 1,
+                      '131072': 1}
 
 instrnMem_pow_dyn_dict = {'512' : 0.46,
                           '1024': 0.53,
                           '2048': 0.65,
 		      	  '4096': 0.65,
-		          '8192': 0.65}
+		          '8192': 0.65,
+                          '16384': 0.65,
+                          '32768': 0.65,
+                          '65536': 0.65,
+                          '131072': 0.65}
 
 instrnMem_pow_leak_dict = {'512' : 0.078,
                            '1024': 0.147,
                            '2048': 0.33,
 		           '4096': 0.33,
-		           '8192': 0.33}
+		           '8192': 0.33,
+                           '16384': 0.33,
+                           '32768': 0.33,
+                           '65536': 0.33,
+                           '131072': 0.33}
 
 
 instrnMem_area_dict = {'512' : 0.00108,
                        '1024': 0.00192,
                        '2048': 0.0041,
 		       '4096': 0.0041,
-		       '8192': 0.0041}
+		       '8192': 0.0041,
+                       '16384': 0.0041,
+                       '32768': 0.0041,
+                       '65536': 0.0041,
+                       '131072': 0.0041}
 
 
 # Xbar_inMem value dictionary (1 access means reading (dac_res) bits for each xbar row)
@@ -542,7 +558,6 @@ if cfg.MVMU_ver == "Analog":
                                 xbar_ip_lat_dict[str(bits_per_cell)] * xbar_ip_pow_dyn_dict[str(bits_per_cell)]
 else:
         xbar_ip_energy_dict = digi_param.Digital_xbar_energy_dict[cfg.MVMU_ver][str(cfg.xbar_size)]
-print('xbar_ip_energy_dict', xbar_ip_energy_dict)
 
 # Chosen leak_power based on config file - only for components whose latency is parameter dependent
 if cfg.MVMU_ver == "Analog":
@@ -578,44 +593,72 @@ memInterface_lat = infinity # infinite latency
 edram_lat_dict = {'8'   : 2,
                   '64'  : 2, #edram access width is constant = 256 bits
                   '128' : 2,
-		  '2048': 2}
+		  '2048': 2,
+                  '8192': 2,
+                  '16384': 2}
 
 edram_pow_dyn_dict = {'8'   : 17.2/2,
                       '64'  : 17.2/2, # (0.0172 nJ with 2 cycles access latency)
                       '128' : 25.35/2,
-		      '2048': 25.35/2}
+		      '2048': 25.35/2,
+                      '8192': 25.35/2,
+                      '16384': 25.35/2}
 
 edram_pow_leak_dict = {'8'   : 0.46,
                        '64'  : 0.46,
                        '128' : 0.77,
-		       '2048': 0.77}
+		       '2048': 0.77,
+                       '8192': 0.77,
+                       '16384': 0.77}
 
 edram_area_dict = {'8'   : 0.086,
                    '64'  : 0.086,
                    '128' : 0.121,
-		   '2048': 0.121}
+		   '2048': 0.121,
+                   '8192': 0.121,
+                   '16384': 0.121}
 
 # Tile Instruction Memory value dictionary
 tile_instrnMem_lat_dict = {'512': 1,
                           '1024': 1,
                           '2048': 1,
-			  '4096': 1}
+			  '4096': 1,
+                          '8192': 1,
+                          '16384': 1,
+                          '32768': 1,
+                          '65536': 1,
+                          '131072': 1}
 
 tile_instrnMem_pow_dyn_dict = {'512' : 0.46,
                                '1024': 0.53,
                                '2048': 0.65,
-			       '4096': 0.65}
+			       '4096': 0.65,
+                               '8192': 0.65,
+                               '16384': 0.65,
+                               '32768': 0.65,
+                               '65536': 0.65,
+                               '131072': 0.65}
 
 tile_instrnMem_pow_leak_dict = {'512' : 0.078,
                                 '1024': 0.147,
                                 '2048': 0.33,
-			        '4096': 0.33}
+			        '4096': 0.33,
+                                '8192': 0.33,
+                                '16384': 0.33,
+                                '32768': 0.33,
+                                '65536': 0.33,
+                                '131072': 0.33}
 
 
 tile_instrnMem_area_dict = {'512' : 0.00108,
                             '1024': 0.00192,
                             '2048': 0.0041,
-			    '4096': 0.0041}
+			    '4096': 0.0041,
+                            '8192': 0.0041,
+                            '16384': 0.0041,
+                            '32768': 0.0041,
+                            '65536': 0.0041,
+                            '131072': 0.0041}
 
 
 # counter storage (2048 Byte Scratch RAM - 1 counter entry shared by 256 bits of data (16 neurons))

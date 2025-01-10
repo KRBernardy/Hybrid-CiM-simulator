@@ -13,11 +13,11 @@ import tile_metrics
 # Area is computed as the summation of all component area (doesn't consider physical layout)
 def compute_area (): #in mm2
     area = 0.0
-    #area += cfg.num_tile_compute * tile_metrics.compute_area ()
-    #area += param.noc_intra_area * (cfg.num_node*(cfg.num_tile_compute+2)) / float(cfg.cmesh_c)
+    area += cfg.num_tile_compute * tile_metrics.compute_area ()
+    area += param.noc_intra_area * (cfg.num_node*(cfg.num_tile_compute+2)) / float(cfg.cmesh_c)
     # Area of all tiles on chip
-    area += cfg.num_tile_max * tile_metrics.compute_area ()
-    area += param.noc_intra_area * (cfg.num_node*(cfg.num_tile_max)) / float(cfg.cmesh_c)
+    #area += cfg.num_tile_max * tile_metrics.compute_area ()
+    #area += param.noc_intra_area * (cfg.num_node*(cfg.num_tile_max)) / float(cfg.cmesh_c)
     area += param.noc_inter_area
     #print ('Node area excludes NOC: ', area)
     return area

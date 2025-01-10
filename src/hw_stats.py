@@ -45,6 +45,30 @@ hw_comp_energy = {'xbar_mvm':{}, \
         'tile_control':param.tcu_pow
         }
 
+hw_comp_area = {"crossbar in memory": param.xbar_inMem_area * cfg.num_tile_compute * cfg.num_ima * (cfg.num_matrix * 3), \
+        "dac": param.dac_area * cfg.num_tile_compute * cfg.num_ima * (cfg.num_matrix * (3 + datacfg.ReRAM_xbar_num)) * cfg.xbar_size, \
+        "crossbar": param.xbar_area * cfg.num_tile_compute * cfg.num_ima * (cfg.num_matrix * 4) * datacfg.ReRAM_xbar_num, \
+        "snh": param.snh_area * cfg.num_tile_compute * cfg.num_ima * (cfg.num_matrix * 2 * 2 * datacfg.ReRAM_xbar_num) * cfg.xbar_size, \
+        #"mux": param.mux_area * cfg.num_tile_compute * cfg.num_ima, \
+        "adc": param.adc_area * cfg.num_tile_compute * cfg.num_ima * cfg.num_adc, \
+        "sna": param.sna_area * cfg.num_tile_compute * cfg.num_ima * (cfg.num_matrix * 2), \
+        "crossbar out memory": param.xbar_outMem_area * cfg.num_tile_compute * cfg.num_ima * (cfg.num_matrix * 3), \
+        "alu": param.alu_area * cfg.num_tile_compute * cfg.num_ima, \
+        "activation unit": param.act_area * cfg.num_tile_compute * cfg.num_ima, \
+        "core instruction memory": param.instrnMem_area * cfg.num_tile_compute * cfg.num_ima, \
+        "core data memory": param.dataMem_area * cfg.num_tile_compute * cfg.num_ima, \
+        "core control": param.ccu_area * cfg.num_tile_compute * cfg.num_ima, \
+        "tile control": param.tcu_area * cfg.num_tile_compute, \
+        "edram": param.edram_area * cfg.num_tile_compute, \
+        "edram controller": param.edram_ctrl_area * cfg.num_tile_compute, \
+        "edram bus": param.edram_bus_area * cfg.num_tile_compute, \
+        "counter buffer": param.counter_buff_area * cfg.num_tile_compute, \
+        "receive buffer": param.receive_buffer_area * cfg.num_tile_compute, \
+        "tile instruction memory": param.tile_instrnMem_area * cfg.num_tile_compute, \
+        "network on chip intra": param.noc_intra_area * (cfg.num_tile_compute+2) / float(cfg.cmesh_c), \
+        "network on chip inter": param.noc_inter_area \
+        }
+
 for bits_per_cell in range(1, 9):
     hw_comp_energy['xbar_mvm'][str(bits_per_cell)] = {}
     for sparsity in range(0, 100, 10):
@@ -279,6 +303,8 @@ def get_hw_stats (fid, node_dut, cycle):
 
     fid.write ('\n')
 
+    # write the area distribution of hardware components
+    get_hw_area(fid)
 
     # Evaluate leakage_energy (tile/ima/noc is power-gated if unused
     leakage_energy = sum_num_cycle_noc * param.noc_intra_pow_leak + \
@@ -323,3 +349,25 @@ def get_hw_stats (fid, node_dut, cycle):
     return metric_dict
 
 
+def get_hw_area (fid):
+    sum_area = 0
+    area_percent = hw_comp_area.copy()
+    for key, value in hw_comp_area.items():
+        sum_area += value
+    for key, value in area_percent.items():
+        area_percent[key] = value / sum_area * 100
+    fid.write ('Area distribution: \n')
+    fid.write ('Component                 area(mm2)              percent\n')
+    for key, value in hw_comp_area.items():
+        # put extra spaces for better visulalization of values
+        bl_spc1 = (28-len(key)) * ' '
+        bl_spc2 = (22-len(str(value))) * ' '
+        fid.write (key + bl_spc1 + str(value) + bl_spc2 + (str(area_percent[key]))[0:4] + ' %\n')
+    fid.write ('\n')
+    fid.write ('Total area: ' + str(sum_area) + ' mm2\n')
+
+if __name__ == '__main__':
+    fid = open ('hw_stats.txt', 'w')
+    get_hw_area (fid)
+    fid.close()
+    print ('Hardware stats written to file hw_stats.txt')

@@ -171,6 +171,15 @@ class edram_controller (object):
                     'Ram Access Error: both ren and wen cannot be same'
 
             # Check for valid (invalid) for LD (ST)
+            try:
+                assert (addr_list[idx] < len(self.valid)), 'Address exceeds edram size'
+            except:
+                print (idx)
+                print (addr_list[idx])
+                print (len(self.valid))
+                print (ren_list[idx])
+                print (wen_list[idx])
+                sys.exit(0)
             if ((self.valid[addr_list[idx]] and ren_list[idx]) or \
                     ((not self.valid[addr_list[idx]]) and wen_list[idx])):
                 found = 1

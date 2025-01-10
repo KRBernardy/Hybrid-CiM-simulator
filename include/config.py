@@ -5,7 +5,7 @@
 from data_config import datacfg
 
 ## Debug - 0 (1): dpe simulation will (won't) produce ima/tile traces while simulating
-cycles_max = 5000000 # Put both these to very large numbers (when design is bug-free)!
+cycles_max = 100000000 # Put both these to very large numbers (when design is bug-free)!
 debug = 1
 xbar_record = 1
 inference = 1
@@ -31,7 +31,7 @@ MVMU_ver = "Analog"
 # instrnMem_size: (in Bytes) - 512, 1024, 2048
 
 # Fixed parameters
-addr_width = 22 # Added to address larger address space for conv layers (#TODO: Compiler needs to fix shared memory reuse)
+addr_width = 32 # Added to address larger address space for conv layers (#TODO: Compiler needs to fix shared memory reuse)
 data_width = datacfg.num_bits # (in bits)
 
 xbdata_width = data_width # (in bits)
@@ -68,8 +68,8 @@ adc_res_new = {
 
 num_ALU = num_matrix*2
 #dataMem_size = num_matrix*(6*xbar_size) # 4 for 4 input spaces within matrix (1 for f/b each, 2 for d)
-dataMem_size = 2048 # 2048 is larger than num_matrix*(6*xbar_size)
-instrnMem_size = 512 #in entries
+dataMem_size = 4096 # same as in compiler
+instrnMem_size = 131072 #in entries
 
 # This depends on above parameters
 if (training):
@@ -100,8 +100,8 @@ receive_buffer_width =  edram_buswidth / datacfg.num_bits # size of receive buff
 
 # Change here - Specify the Tile parameters here
 num_ima = 8
-edram_size = 64 # in Kilobytes (64 KB - same as issac)
-tile_instrnMem_size = 2048 # in entries
+edram_size = 16384 # in Kilobytes (64 KB - same as issac)
+tile_instrnMem_size = 131072 # in entries
 
 ## Node configurable parameters (permissible values for each parameter provided here)
 ## Instruction generation - affected by num_tile
@@ -136,3 +136,6 @@ encrypted = False
 authenticated = False
 cypher_name = ''
 cypher_hash = ''
+
+# Thread number for parallel processing
+thread_num = 128

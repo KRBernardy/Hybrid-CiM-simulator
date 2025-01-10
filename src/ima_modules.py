@@ -840,7 +840,7 @@ class instrn_memory (memory):
     # To initilzie the memory with instructions
     def load (self, dict_list):
         if (len(dict_list) > self.size):
-            print ('instruction memory size requirement', len(dict_list))
+            print ('instruction memory size requirement', len(dict_list), self.size)
         assert (len(dict_list) <= self.size), 'instructions exceed the instruction memory size'
         for i in range(len(dict_list)):
             self.memfile[i] = dict_list[i]

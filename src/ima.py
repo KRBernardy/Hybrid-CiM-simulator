@@ -508,7 +508,20 @@ class ima (object):
                 for i in range (self.de_r2):
                     dst_addr = data_addr + i
                     if (dst_addr >= datamem_off):
-                        self.dataMem.write (dst_addr, data[i])
+                        try:
+                            self.dataMem.write (dst_addr, data[i])
+                        except:
+                            print(data)
+                            print(len(data))
+                            print(i)
+                            print(self.ima_id)
+                            print(self.de_d1)
+                            print(self.ex_vec_count)
+                            print(self.de_r1)
+                            print(self.de_r2)
+                            print(self.de_vec)
+                            assert(0)
+                            
                     else:
                         writeToXbarMem (self, dst_addr, data[i])
 

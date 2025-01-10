@@ -25,18 +25,21 @@ import sys
 import getopt
 import os
 import argparse
+import subprocess
 
 
-root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-src_dir = os.path.join(root_dir, "src")
-include_dir = os.path.join(root_dir, "include")
-test_dir = os.path.join(root_dir, "test")
+root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+simulator_dir = os.path.join(root_dir, "srcs/Hybrid-CiM-Simulator")
+data_dir = os.path.join(root_dir, "data")
+src_dir = os.path.join(simulator_dir, "src")
+include_dir = os.path.join(simulator_dir, "include")
+test_dir = os.path.join(data_dir, "test")
 security_dir=os.path.join(root_dir, "Security")
 
 sys.path.insert(1, security_dir)
 sys.path.insert(0, include_dir)
 sys.path.insert(0, src_dir)
-sys.path.insert(0, root_dir)
+sys.path.insert(0, simulator_dir)
 
 # Set the instruction & trace paths (create the folder hierarchy)
 # Assumption: All instructions for all TILEs and IMAs have already been generated
@@ -64,20 +67,16 @@ from Factory import Factory
 
 
 
-compiler_path = os.path.join(root_dir, "test/testasm/")
-trace_path = os.path.join(root_dir, "test/traces/")
+compiler_path = os.path.join(data_dir, "test/testasm/")
+trace_path = os.path.join(data_dir, "test/traces/")
 
 
-def count_tiles(net_path):
-    t_count = 0
-    while os.path.isdir(net_path + "/tile" + str(t_count)):
-        t_count += 1
-    return t_count
+
 
 
 class DPE:
 
-    def run(self, net):
+    def run(self, net, inp_path):
         print(test_dir)
         instrndir = compiler_path + net
         #tracedir = os.path.join(os.path.join(test_dir, 'traces'), net.split('/')[-1])
@@ -117,7 +116,7 @@ class DPE:
 
         self.instrnpath = instrndir + '/'
         self.tracepath = tracedir + '/'
-
+        
         # Instantiate the node under test
         # A physical node consists of several logical nodes equal to the actual node size
         node_dut = node.node()
@@ -128,19 +127,18 @@ class DPE:
         node_dut.node_init(self.instrnpath, self.tracepath)
 
         # Read the input data (input.t7) into the input tile's edram
-     
-        inp_filename = os.path.join(str(self.instrnpath) ,'input.npy')
+
 
 
         inp_tileId = 0
-        assert (os.path.exists(inp_filename)
+        assert (os.path.exists(inp_path)
                 ), 'Input Error: Provide input before running the DPE'
 
         assert (os.path.exists(instrndir+'/'+'tile0')
                 ), 'Input Error: Provide input before running the DPE'
   
             
-        inp = np.load(inp_filename, allow_pickle=True).item()
+        inp = np.load(inp_path, allow_pickle=True).item()
         print ('length of input data:', len(inp['data']))
         for i in range(len(inp['data'])):
             data = float2fixed(inp['data'][i], datacfg.int_bits, datacfg.frac_bits)
@@ -185,18 +183,20 @@ class DPE:
         #    record_xbar(node_dut)
 
         # Dump the contents of output tile (DNN output) to output file (output.txt)
-        output_file = self.tracepath + 'output.txt'
+        output_file = self.tracepath + 'sim_output.txt'
         fid = open(output_file, 'w')
-        tile_id = cfg.num_tile - 1
+        tile_id = 1
         mem_dump(
             fid, node_dut.tile_list[tile_id].edram_controller.mem.memfile, 'EDRAM')
         fid.close()
         print('Output Tile dump finished')
-
+        
         # Dump the harwdare access traces (For now - later upgrade to actual energy numbers)
         hwtrace_file = self.tracepath + 'harwdare_stats.txt'
+        # hwarea_file = self.tracepath + 'harwdare_area.txt'
         fid = open(hwtrace_file, 'w')
         metric_dict = get_hw_stats(fid, node_dut, cycle)
+        # get_hw_area(fid)
         fid.close()
         print('Success: Hardware results compiled!!')
 
@@ -224,22 +224,15 @@ if __name__ == '__main__':
     if cfg.encrypted :
         model_path = os.path.join(compiler_path,net,"crypto") 
     else:
-        model_path = os.path.join(compiler_path,net) 
-
-    total_tiles = count_tiles(model_path) - 2
-    print(total_tiles)
-
-    if(args.tile != -1):
-        total_tiles = int(args.tile)
-
-    cfg.num_tile_compute = total_tiles
-    cfg.num_tile = cfg.num_node * cfg.num_tile_compute + 2
+        model_path = os.path.join(compiler_path,net)
+    
+    inp_path = '/HybridCiM/data/test/dataset/default_input.npy'
     
     #print(cfg.num_tile)
     #print(cfg.encrypted)
     #print(cfg.cypher_name)
    
     print('Input net is {}'.format(net))
-    print(compiler_path)
-    DPE().run(net)
+    #print(compiler_path)
+    DPE().run(net, inp_path)
     
