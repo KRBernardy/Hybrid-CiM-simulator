@@ -104,9 +104,9 @@ if (inst_refresh):
     i_temp = i_hlt()
     dict_list.append (i_temp.copy())
 
-    print (inst_file + ' generated...')
+    print((inst_file + ' generated...'))
     np.save (inst_file, dict_list)
-    print ('Total no. of instructions: ', len(dict_list))
+    print(('Total no. of instructions: ', len(dict_list)))
 
 
 ## Simulate core
@@ -143,8 +143,8 @@ out_exp = np.asarray(out_exp)
 #print (out_exp)
 
 err = np.tanh(out_gold) - np.tanh(out_exp)
-print ("error has mean " + str(np.average(err)) + " and stdev " + \
-        str(np.std(err)))
+print(("error has mean " + str(np.average(err)) + " and stdev " + \
+        str(np.std(err))))
 
 ## 2. individual xbar MVM check (no shift-and-add) - PASSED
 #wt_gold = np.load (wt_path+'phy_xbar4.npy')

@@ -130,9 +130,9 @@ if (inst_refresh):
     i_temp = i_hlt()
     dict_list.append (i_temp.copy())
 
-    print (inst_file + ' generated...')
+    print((inst_file + ' generated...'))
     np.save (inst_file, dict_list)
-    print ('Total no. of instructions: ', len(dict_list))
+    print(('Total no. of instructions: ', len(dict_list)))
 
 
 ## Simulate core
@@ -173,18 +173,18 @@ out_expB = np.asarray(out_expB)
 
 errF = abs(np.tanh(out_gold) - np.tanh(out_expF))
 errB = abs(np.tanh(out_gold) - np.tanh(out_expB))
-print ("fw xbar error has mean " + str(np.average(errF)) + " and stdev " + \
-        str(np.std(errF)))
-print ("bw xbar error has mean " + str(np.average(errB)) + " and stdev " + \
-        str(np.std(errB)))
+print(("fw xbar error has mean " + str(np.average(errF)) + " and stdev " + \
+        str(np.std(errF))))
+print(("bw xbar error has mean " + str(np.average(errB)) + " and stdev " + \
+        str(np.std(errB))))
 
 # 2. MVM instruction - inner-product (f,b xbar), followed by outer-product (d-xbar) - keep upto MVM ('001') instrn
 out_goldD = cfg.lr * np.outer (out_expF, out_expB)
 out_expD = ima.get_matrix (0, 'd')
 
 errD = abs(out_goldD - out_expD)
-print ("delta xbar error has mean " + str(np.average(errD)) + " and stdev " + \
-        str(np.std(errD)))
+print(("delta xbar error has mean " + str(np.average(errD)) + " and stdev " + \
+        str(np.std(errD))))
 
 # 3. CRS instruction - read wt slices delta xbars, compose wt, write slices to f/b xbars - keep upto CRS instrn
 out_expF = ima.get_matrix (0, 'f')
@@ -192,10 +192,10 @@ out_expB = ima.get_matrix (0, 'b')
 out_expD = ima.get_matrix (0, 'd')
 errFD = abs (out_expF - out_expD)
 errBD = abs (out_expB - out_expD)
-print ("f-d matrix error has mean " + str(np.average(errFD)) + " and stdev " + \
-        str(np.std(errFD)))
-print ("b-d matrix error has mean " + str(np.average(errBD)) + " and stdev " + \
-        str(np.std(errBD)))
+print(("f-d matrix error has mean " + str(np.average(errFD)) + " and stdev " + \
+        str(np.std(errFD))))
+print(("b-d matrix error has mean " + str(np.average(errBD)) + " and stdev " + \
+        str(np.std(errBD))))
 
 
 

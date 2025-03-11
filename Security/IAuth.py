@@ -9,9 +9,7 @@
 #****************************************************************************************
 from abc import ABCMeta, abstractmethod
 
-class IAuth:
-    __metaclass__ = ABCMeta
-
+class IAuth(metaclass=ABCMeta):
     @abstractmethod
     def generateMACModel(self,path): raise NotImplementedError
 

@@ -41,7 +41,7 @@ class PumaFernet(ICryptography):
           path1=os.path.join(path, name)
           
   
-          print("Encrypting "+name+"...")
+          print(("Encrypting "+name+"..."))
           for root1,dirs1,files1 in os.walk(path1):
             for file in files1:
               with open(path1+"/"+file, 'rb') as myfile:
@@ -54,7 +54,7 @@ class PumaFernet(ICryptography):
         if(done==1):
             break
       final_time = time.time() - init_time 
-      print("Finished encryption in " + "{0:.4f}".format(final_time) + " seconds")  
+      print(("Finished encryption in " + "{0:.4f}".format(final_time) + " seconds"))  
     
     
 
@@ -73,7 +73,7 @@ class PumaFernet(ICryptography):
               break
           os.makedirs(os.path.join(path,str(name)))
           path1=os.path.join(crypto_path, name)
-          print("Decrypting "+name+"...")
+          print(("Decrypting "+name+"..."))
           for root1,dirs1,files1 in os.walk(path1):
             for file in files1:
               with open(os.path.join(path1,file), 'rb') as myfile:
@@ -86,7 +86,7 @@ class PumaFernet(ICryptography):
           break
                 
       final_time = time.time() - init_time 
-      print("Finished decryption in " + "{0:.4f}".format(final_time) + " seconds")  
+      print(("Finished decryption in " + "{0:.4f}".format(final_time) + " seconds"))  
     
     
     

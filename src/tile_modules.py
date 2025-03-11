@@ -2,6 +2,7 @@
 # IMA, EDRAM, EDRAM controller
 
 import sys
+import numpy as np
 import config as cfg
 import constants as param
 import ima_modules
@@ -9,8 +10,8 @@ from ima_modules import int2bin
 
 # function to check keys match between two dictionaries
 def dict_match (dict1, dict2):
-    for keyone in dict1.keys():
-        if keyone not in dict2.keys():
+    for keyone in list(dict1.keys()):
+        if keyone not in list(dict2.keys()):
             return 0
     return 1
 
@@ -119,9 +120,9 @@ class edram_controller (object):
         self.num_access_counter = 0
 
         # Instantiate EDRAM, valid and counter fields
-        self.mem  = edram (cfg.edram_size*1024*8/(cfg.data_width)) #edram_size is in KB
-        self.valid  = [0] * (cfg.edram_size*1024*8/(cfg.data_width)) #edram_size is in KB
-        self.counter  = [0] * (cfg.edram_size*1024*8/(cfg.data_width)) #edram_size is in KB
+        self.mem  = edram (cfg.edram_size * 1024 * 8 // (cfg.data_width)) #edram_size is in KB
+        self.valid  = [0] * (cfg.edram_size * 1024 * 8 // (cfg.data_width)) #edram_size is in KB
+        self.counter  = [0] * (cfg.edram_size * 1024 * 8 // (cfg.data_width)) #edram_size is in KB
 
         # Define latency
         self.latency = param.edram_lat
@@ -134,6 +135,26 @@ class edram_controller (object):
 
     # Based on the arbitration logic, decide which ima will be served
     def find_next (self, ren_list, wen_list):
+        """
+        Finds the next available read or write slot using round-robin scheduling.
+    
+        Args:
+            ren_list: List of read enable flags (0 or 1)
+            wen_list: List of write enable flags (0 or 1)
+        
+        Returns:
+            int: Index of next available slot
+        """
+        if len(ren_list) <= 1:
+            return 0
+        list_size = len(ren_list)
+        next_idx = (self.lastIdx + 1) % list_size
+        for i in range (next_idx, next_idx + list_size):
+            idx = i % list_size
+            if (ren_list[idx] or wen_list[idx]):
+                return idx
+        return param.infinity
+        '''
         if (len(ren_list) > 1):
             if ((1 in ren_list[self.lastIdx+1:]) or (1 in wen_list[self.lastIdx+1:])):
                 idx1 = ren_list[self.lastIdx+1:].index(1) if any(ren_list[self.lastIdx+1:]) \
@@ -149,6 +170,7 @@ class edram_controller (object):
                 return min (idx1, idx2)
         else: # for one IMA case only
             return 0
+        '''
 
     def propagate (self, ren_list, wen_list, rd_width_list, wr_width_list, ramstore_list, addr_list):
 
@@ -175,10 +197,10 @@ class edram_controller (object):
                 assert (addr_list[idx] < len(self.valid)), 'Address exceeds edram size'
             except:
                 print (idx)
-                print (addr_list[idx])
-                print (len(self.valid))
-                print (ren_list[idx])
-                print (wen_list[idx])
+                print((addr_list[idx]))
+                print((len(self.valid)))
+                print((ren_list[idx]))
+                print((wen_list[idx]))
                 sys.exit(0)
             if ((self.valid[addr_list[idx]] and ren_list[idx]) or \
                     ((not self.valid[addr_list[idx]]) and wen_list[idx])):
@@ -208,4 +230,8 @@ class edram_controller (object):
                     self.valid[addr+i] = 1
                     self.counter[addr+i] = int(counter)
             return [found, idx, '']
-
+    
+    def check(self, addr):
+        # check if the address is valid
+        # this is for debugging purposes
+        return self.valid[addr]

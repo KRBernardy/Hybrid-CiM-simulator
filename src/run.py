@@ -4,7 +4,9 @@ import os
 import argparse
 import subprocess
 import threading
-from multiprocessing.pool import ThreadPool
+from multiprocessing import Pool, Queue, Process, Manager
+import time
+import psutil
 from functools import partial
 from queue import Queue
 
@@ -13,7 +15,6 @@ simulator_dir = os.path.join(root_dir, "srcs/Hybrid-CiM-Simulator")
 data_dir = os.path.join(root_dir, "data")
 src_dir = os.path.join(simulator_dir, "src")
 include_dir = os.path.join(simulator_dir, "include")
-test_dir = os.path.join(data_dir, "test")
 security_dir=os.path.join(root_dir, "Security")
 
 sys.path.insert(1, security_dir)
@@ -41,10 +42,9 @@ import ima_metrics
 import tile_metrics
 import node_metrics
 import dnn_wt_p
-from Factory import Factory
 
-compiler_path = '/HybridCiM/data/test/testasm/'
-trace_path = '/HybridCiM/data/test/traces/'
+compiler_path = '/HybridCiM/data/testasm/'
+trace_path = '/HybridCiM/data/traces/'
 
 def modify_datacfg(config_id):
     with open('../include/data_config.py', 'r') as file:
@@ -58,6 +58,19 @@ def modify_datacfg(config_id):
     # Write the changes back to the file
     with open('../include/data_config.py', 'w') as file:
         file.writelines(lines)
+    
+def modify_tile_num(tile_num):
+    with open('../include/config.py', 'r') as file:
+        lines = file.readlines()
+
+    # Modify the line containing the variable
+    for i, line in enumerate(lines):
+        if line.startswith('num_tile_compute = '):
+            lines[i] = "num_tile_compute = {}\n".format(tile_num)
+
+    # Write the changes back to the file
+    with open('../include/config.py', 'w') as file:
+        file.writelines(lines)
 
 def count_tiles(net_path):
     t_count = 0
@@ -65,10 +78,32 @@ def count_tiles(net_path):
         t_count += 1
     return t_count
 
+def check_RAM():
+    ram = psutil.virtual_memory()
+    return ram.available > 256 * 1024 * 1024 * 1024  # 256GB in bytes
+
 def preprocess(net):
+    print(("Preprocessing net {}.".format(net)))
     instrndir = compiler_path + net
     
     # Run generate-py.sh
+    try:
+        result = subprocess.run(
+            ['/bin/bash', '../script/generate-py.sh', instrndir],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+    
+        if result.returncode != 0:
+            print("Error in generate-py.sh:")
+            print(result.stderr)
+            sys.exit(1)
+        print(result.stdout)
+    except Exception as e:
+        print(f"Failed to execute script: {e}")
+        sys.exit(1)
+    '''
     cmd1 = ['/bin/bash', '../script/generate-py.sh', instrndir]
     p1 = subprocess.Popen(cmd1, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout1, stderr1 = p1.communicate()
@@ -77,6 +112,7 @@ def preprocess(net):
         print(stderr1)
         sys.exit(1)
     print(stdout1)
+    '''
     
     # Run populate.py
     cmd2 = ['python', 'populate.py', '--path', instrndir]
@@ -87,9 +123,10 @@ def preprocess(net):
         print(stderr2)
         sys.exit(1)
     print(stdout2)
+    print(("Completed preprocessing net {}.".format(net)))
 
-def run_dpe(net, inp, instance_id, result_queue):
-    print("Starting DPE instance {}.".format(instance_id))
+def run_dpe(net, inp, instance_id):
+    print(("Starting DPE instance {}.".format(instance_id)))
 
     instrndir = compiler_path + net
     tracedir = trace_path + net
@@ -120,14 +157,16 @@ def run_dpe(net, inp, instance_id, result_queue):
         node_dut.tile_list[inp_tileId].edram_controller.counter[i] = int(inp['counter'][i])
         node_dut.tile_list[inp_tileId].edram_controller.valid[i] = int(inp['valid'][i])
 
-    dnn_wt_p.dnn_wt().prog_dnn_wt(self.instrnpath, node_dut)
+    dnn_wt_p.dnn_wt().prog_dnn_wt(instrnpath, node_dut)
 
     cycle = 0
     while (not node_dut.node_halt and cycle < cfg.cycles_max):
         node_dut.node_run(cycle)
         cycle = cycle + 1
+        '''
         if (instance_id % cfg.thread_num == 0):
-            print("Cycle: ", cycle)
+            print ('Cycle: ', cycle, 'Tile halt list', node_dut.tile_halt_list)
+        '''
     
     memfile = node_dut.tile_list[out_tileId].edram_controller.mem.memfile
     output = []
@@ -139,16 +178,23 @@ def run_dpe(net, inp, instance_id, result_queue):
             output.append(temp_val)
     
     if instance_id == 0:
-        hwtrace_file = self.tracepath + 'harwdare_stats.txt'
+        hwtrace_file = tracepath + 'harwdare_stats.txt'
         fid = open(hwtrace_file, 'w')
         metric_dict = get_hw_stats(fid, node_dut, cycle)
         fid.close()
 
-    print("Completed DPE instance {}.".format(instance_id))
+    print(("Completed DPE instance {}.".format(instance_id)))
 
     result = {'instance_id': instance_id, 'output': output}
-    result_queue.put(result)
-    
+    return result
+
+def run_dpe_wrapper(args):
+    net, input_data, instance_id = args
+    if not check_RAM():
+        print("Warning: Not enough RAM available to run DPE instance, waiting...")
+        while not check_RAM():
+            time.sleep(100)
+    return run_dpe(net, input_data, instance_id)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -172,47 +218,44 @@ if __name__ == '__main__':
     model_path = os.path.join(compiler_path, args.net)
 
     total_tiles = count_tiles(model_path) - 2
+    print(("Total tiles: {}".format(total_tiles)))
 
     if(args.tile != -1):
         total_tiles = int(args.tile)
 
-    cfg.num_tile_compute = total_tiles
-    cfg.num_tile = cfg.num_node * cfg.num_tile_compute + 2
+    modify_tile_num(total_tiles)
 
     if args.dataset == 'none':
         cfg.debug = True
         os.system('python dpe.py -n ' + args.net)
     else:
         cfg.debug = False
-        threads = []
-        results = []
-        result_queue = Queue()
-        inp = np.load('/HybridCiM/data/test/dataset/' + args.dataset + '.npy', allow_pickle=True)
-        total_inputs = len(inp)
+        manager = Manager()
+        results = manager.list()
+        inp = np.load('/HybridCiM/data/dataset/' + args.dataset + '_input.npy', allow_pickle=True, encoding='latin1')
+        labels = np.load('/HybridCiM/data/dataset/' + args.dataset + '_labels.npy', allow_pickle=True, encoding='latin1')
+        #total_inputs = len(inp)
+        total_inputs = 8
 
-        for batch_start in range(0, total_inputs, cfg.thread_num):
-            threads = []
-            result_queue = Queue()
-            batch_end = min(batch_start + cfg.thread_num, total_inputs)
+        for i in range(total_inputs):
+            inp[i]['data'] = quantize_to_fixed(inp[i]['data'])
+
+        args_list = []
+        for i in range(total_inputs):
+            if i < len(inp):
+                args_list.append((args.net, inp[i], i))
         
-            # Launch threads for current batch
-            for i in range(batch_start, batch_end):
-                thread = threading.Thread(target=run_dpe, args=(args.net, inp[i], i, result_queue))
-                threads.append(thread)
-                thread.start()
+
+        pool = Pool(processes = min(cfg.thread_num, total_inputs))
+        process_results = pool.map(run_dpe_wrapper, args_list)
+        pool.close()
+        pool.join()
+
+        results.extend(process_results)
+        results = list(results)
+        print("All DPE instances completed.")
+        #print(results)
         
-            # Wait for batch completion
-            for thread in threads:
-                thread.join()
-        
-            # Collect batch results
-            while not result_queue.empty():
-                result = result_queue.get()
-                results.append(result)
-        
-            print("Completed {} inputs".format(batch_end))
-        
-        labels = np.load('/HybridCiM/data/test/dataset/' + args.dataset + '_labels.npy')
 
         # sort results by instance_id
         results.sort(key=lambda x: x['instance_id'])
@@ -224,9 +267,10 @@ if __name__ == '__main__':
                 correct += 1
         
         accuracy = correct / total_inputs
+        print(("Accuracy: {}".format(accuracy)))
 
 
-        output_file = tracepath + args.net + '/sim_output.txt'
+        output_file = trace_path + args.net + '/sim_output.txt'
         fid = open(output_file, 'w')
         fid.write("Accuracy: {}\n\n".format(accuracy))
         for i in range(total_inputs):

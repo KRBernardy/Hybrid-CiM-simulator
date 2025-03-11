@@ -4,7 +4,7 @@ import config as cfg
 import math
 import constants_digital as digi_param
 # Limits the number of cycles an IMA runs in case it doesn't halt
-infinity = 100000
+infinity = 10000000
 
 #############################################################################################################
 ## Technology/Other constants for all the modules
@@ -65,7 +65,7 @@ last_stage = 'ex'
 # IMA component latency/power/area dictionary (all values in ns, mw, mm2)
 
 #ReRAM accuracy degradtion. Use ReRAM_read_sigma = 0 for no degradtion
-ReRAM_read_sigma = 0.01
+ReRAM_read_sigma = 0
 
 # XBAR - Models from ISAAC paper
 xbar_lat_dict = {'2': {'32' : 32,   # first indexed by xbar_bits then by xbar_size
@@ -238,6 +238,12 @@ adc_lat_dict = {'1' : 12.5,
                 '7' : 87.5,
                 '8' : 100,
 		'9' : 112.5,
+                '10': 125,
+                '11': 137.5,
+                '12': 150,
+                '13': 162.5,
+                '14': 175,
+                '15': 187.5,
                 '16': 200}
 
 adc_pow_dyn_dict = {'1' : 0.225,
@@ -249,6 +255,12 @@ adc_pow_dyn_dict = {'1' : 0.225,
                     '7' : 1.575,
                     '8' : 1.8,
 		    '9' : 2.025,
+                    '10': 2.25,
+                    '11': 2.475,
+                    '12': 2.7,
+                    '13': 2.925,
+                    '14': 3.15,
+                    '15': 3.375,
                     '16': 3.6}
 
 adc_pow_leak_dict = {'1' : 0.025,
@@ -260,6 +272,12 @@ adc_pow_leak_dict = {'1' : 0.025,
                      '7' : 0.175,
                      '8' : 0.2,
 		     '9' : 0.225,
+                     '10': 0.25,
+                     '11': 0.275,
+                     '12': 0.3,
+                     '13': 0.325,
+                     '14': 0.35,
+                     '15': 0.375,
                      '16': 0.4}
 
 adc_area_dict = {'1' : 0.0012,
@@ -271,6 +289,12 @@ adc_area_dict = {'1' : 0.0012,
                  '7' : 0.0012,
                  '8' : 0.0012,
 		 '9' : 0.0012,
+                 '10': 0.0012,
+                 '11': 0.0012,
+                 '12': 0.0012,
+                 '13': 0.0012,
+                 '14': 0.0012,
+                 '15': 0.0012,
                  '16': 0.0012}
 
 diff_adc_lat_dict = {'1' : 12.5,
@@ -577,7 +601,7 @@ ccu_area = 0.00145*2.25 #taken similar as edctrl (scaled by power)
 
 # Added here for simplicity now (***can need modification later***)
 # The latency of mem access is dependent on when can the ima find edram bys non-busy
-memInterface_lat = infinity # infinite latency
+memInterface_lat = infinity # infinite latency, here 10000000
 
 #############################################################################################################
 # Tile Hierarchy

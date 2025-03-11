@@ -37,7 +37,7 @@ def mem_dump (fid, memfile, name, node = '', tile_id = ''):
 def node_dump (node, filepath = ''):
     assert (filepath != ''), 'Debug flag is set, filepath cannot be nil'
     for i in range(len(node.tile_list)):
-        print ('Dumping tile num: ', i)
+        print(('Dumping tile num: ', i))
         filename = filepath + 'tile' + str(i) + '/memsim.txt'
         fid = open (filename, 'w')
 

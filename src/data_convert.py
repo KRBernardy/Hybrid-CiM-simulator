@@ -5,7 +5,18 @@
 # 4. binary (2s complement) to inetger [bit-string to int]
 import numpy as np
 import include.constants as param
+from include.data_config import datacfg
 
+# this function is used to quantize an array (2s complement)
+
+def quantize_to_fixed(x, int_bits = datacfg.int_bits, frac_bits = datacfg.frac_bits):
+    """Quantize numpy array to fixed point"""
+    scale = 2.0 ** frac_bits
+    max_val = 2.0 ** (int_bits - 1) - 1.0 / scale
+    min_val = -2.0 ** (int_bits - 1)
+    x = np.clip(x, min_val, max_val)
+    x = np.round(x * scale) / scale
+    return x
 
 # this function is used to convert bin str to proper ReRAM conductance
 

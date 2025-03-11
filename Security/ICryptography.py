@@ -10,10 +10,7 @@
 #****************************************************************************************
 from abc import ABCMeta, abstractmethod
 
-class ICryptography:
-    __metaclass__ = ABCMeta
-
-    #Encrypts a model
+class ICryptography(metaclass=ABCMeta):
     @abstractmethod
     def encrypt(self,path): raise NotImplementedError
     #Decrypts a model

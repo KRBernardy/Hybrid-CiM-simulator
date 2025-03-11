@@ -24,13 +24,13 @@ import include.config as cfg
 class RegTest1:
 
     def run(self, net):
-        print("Trace directory: ", trace_dir)
+        print(("Trace directory: ", trace_dir))
         net_dir = os.path.join(trace_dir, str(net))
         weight_dir = os.path.join(root_dir, "test/testasm/" + str(net) + "/weights")
         sys.path.insert(0, net_dir)
         sys.path.insert(0, weight_dir)
-        print("Net directory: ", net_dir)
-        print(" Weight  directory: ", weight_dir)
+        print(("Net directory: ", net_dir))
+        print((" Weight  directory: ", weight_dir))
 
         assert (os.path.exists(net_dir) ==1), 'Could not find net'
         '''if not os.path.exists(net_dir):
@@ -83,7 +83,7 @@ class RegTest1:
 
                         err = np.tanh(out_gold) - np.tanh(out_exp)
 
-                        print("error for Tile " + str(i) + " , Core " + str(j) + " , Matrix " + str(k) + " has mean " + str(np.average(err)) + " and stdev " + str(np.std(err))) 
+                        print(("error for Tile " + str(i) + " , Core " + str(j) + " , Matrix " + str(k) + " has mean " + str(np.average(err)) + " and stdev " + str(np.std(err)))) 
                         
                         avg_mean_err += np.average(err)
                         avg_stdev_err += np.std(err)
@@ -93,7 +93,7 @@ class RegTest1:
         avg_stdev_err = avg_stdev_err/count
 
     
-        print("On average, for all tiles, error has mean " + str(avg_mean_err) + " and stdev " + str(avg_stdev_err))    
+        print(("On average, for all tiles, error has mean " + str(avg_mean_err) + " and stdev " + str(avg_stdev_err)))    
 
 
 
@@ -112,7 +112,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     net = args.net
 
-    print('Running Regression Test 1 for {} \n'.format(net))
+    print(('Running Regression Test 1 for {} \n'.format(net)))
     RegTest1().run(net) 
     
 

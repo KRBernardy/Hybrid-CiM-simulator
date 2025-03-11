@@ -125,12 +125,12 @@ class node (object):
 
         # For DEBUG
         #if (cycle%5000 == 0):
-        print ('Cycle: ', cycle, 'Tile halt list', self.tile_halt_list)
+        #print ('Cycle: ', cycle, 'Tile halt list', self.tile_halt_list)
 
         # check if node halted
         if (all (self.tile_halt_list)):
             self.node_halt = 1
             for tr_id in self.tile_fid_list:
                 tr_id.close ()
-            print ('cycle: ' + str (cycle) + ' Node Halted')
+            print(('cycle: ' + str (cycle) + ' Node Halted'))
 

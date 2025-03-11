@@ -1,6 +1,6 @@
 ## This file contains the data structures used in differnet hierarchies.
 ## It also holds power, area and latency numbers of different component used in DPE design
-import config as cfg
+from . import config as cfg
 import math
 # Limits the number of cycles an IMA runs in case it doesn't halt
 infinity = 100000

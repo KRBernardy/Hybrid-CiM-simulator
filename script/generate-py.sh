@@ -18,13 +18,13 @@ if [ ! -d "$SEARCH_DIR" ]; then
 fi
 
 if [[ $SIMULATOR_PATH == "" ]] ; then
-    print "Error, missing simulator path."
+    echo "Error, missing simulator path."
     exit
 fi
 
 prev_dataset=""
 
-PYTHON=python2
+PYTHON=python3
 
 cd "$SEARCH_DIR"
 

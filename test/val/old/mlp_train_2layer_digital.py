@@ -61,7 +61,7 @@ dict_list.append (i_temp.copy())
 
 filename = path+'/tile0/tile_imem.npy'
 np.save(filename, dict_list)
-print ('Total no. of instructions: ', len(dict_list))
+print(('Total no. of instructions: ', len(dict_list)))
 
 # Create Tile0-IMA0 instructions
 dict_list = []
@@ -71,7 +71,7 @@ dict_list.append (i_temp.copy())
 
 filename = path+'/tile0/core_imem0.npy'
 np.save(filename, dict_list)
-print ('Total no. of instructions: ', len(dict_list))
+print(('Total no. of instructions: ', len(dict_list)))
 
 # Create Tile1 instructions
 dict_list = []
@@ -85,7 +85,7 @@ dict_list.append (i_temp.copy())
 
 filename = path+'/tile1/tile_imem.npy'
 np.save(filename, dict_list)
-print ('Total no. of instructions: ', len(dict_list))
+print(('Total no. of instructions: ', len(dict_list)))
 
 # Create Tile1-IMA0 instructions
 # instructions for IMA1
@@ -157,7 +157,7 @@ dict_list.append (i_temp.copy())
 
 filename = path+'/tile1/core_imem0.npy'
 np.save(filename, dict_list)
-print ('Total no. of instructions: ', len(dict_list))
+print(('Total no. of instructions: ', len(dict_list)))
 
 
 ## VALIDATE WITH SOFTWARE OUTPUT (compare new weight after back-prop)

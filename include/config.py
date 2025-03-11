@@ -44,7 +44,7 @@ num_matrix = 6 # each matrix is 1-fw logical xbar for inference and 1-fw, 1-bw, 
 xbar_size = 128
 dac_res = 1
 # ADC configuration
-adc_res = 8 # this value should be around 4 to 8.
+adc_res = 9 # this value should be around 4 to 16.
 adc_type = 'normal' # 'normal' or 'differential'
 # num_column_per_adc is number of xbar columns per adc. Notice that a positive column next to a negative column is considered as one column here.
 # Needs to make sure that xbar_size is multiple of num_column_per_adc. Recommanded value is 16 for normal ADC and 8 for differential ADC ().
@@ -96,7 +96,7 @@ instrn_width = 48 # bits (op-2, vtile_id-6, send/receive_width-8, target_addr/co
 edram_buswidth = 256 # in bits
 #receive_buffer_depth = 16
 receive_buffer_depth = 150 #set equal to num_tile_max
-receive_buffer_width =  edram_buswidth / datacfg.num_bits # size of receive buffeer entry (in terms of number of neurons)
+receive_buffer_width =  edram_buswidth // datacfg.num_bits # size of receive buffeer entry (in terms of number of neurons)
 
 # Change here - Specify the Tile parameters here
 num_ima = 8
@@ -118,7 +118,7 @@ packet_width = edram_buswidth/data_width #in multiples of flits (data considered
 # (b bit of address = logN, N is the number of nodes)
 
 # Change here - Specify the Node parameters here
-num_tile_compute = 3 # number of tiles mapped by dnn (leaving input and output tiles)
+num_tile_compute = 3
 num_tile_max = 168.0 # maximum number of tiles per node
 num_inj_max = num_tile_max # [conservative] max number of packet injections that can occur in a cycle (each tile injects a packet into NOC each cycle)
 noc_inj_rate = 0.005
@@ -138,4 +138,4 @@ cypher_name = ''
 cypher_hash = ''
 
 # Thread number for parallel processing
-thread_num = 128
+thread_num = 8

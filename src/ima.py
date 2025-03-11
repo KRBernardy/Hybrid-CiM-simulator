@@ -2,6 +2,9 @@
 
 # add the folder location for include files
 import sys, json
+import time
+
+from line_profiler import profile
 
 # import dependancy files
 import numpy as np
@@ -33,6 +36,7 @@ class ima (object):
     #######################################################
     ### Instantiate different modules
     #######################################################
+    
     def __init__ (self):
 
         # Assign a ima_id for identification purpose in debug trace
@@ -107,7 +111,7 @@ class ima (object):
         # When using differential ADC, list will be in form of [matrix_id][key][xbar_id][adc_id]
         self.adc_list = []
         self.adc_type = cfg.adc_type
-        adc_per_xbar = cfg.xbar_size / cfg.num_column_per_adc
+        adc_per_xbar = cfg.xbar_size // cfg.num_column_per_adc
         for mat_id in range(cfg.num_matrix):
             self.adc_list.append({})
             for key in ['f', 'b']:
@@ -136,7 +140,7 @@ class ima (object):
         # Instatiate MUX
         # MUX list will be in form of [matrix_id][key][xbar_id][mux_id][pos/neg]
         self.mux_list = []
-        mux_per_xbar = cfg.xbar_size / cfg.num_column_per_adc
+        mux_per_xbar = cfg.xbar_size // cfg.num_column_per_adc
         for mat_id in range(cfg.num_matrix):
             self.mux_list.append({})
             for key in ['f', 'b']:
@@ -437,7 +441,7 @@ class ima (object):
                 xbar_addr = data_addr % cfg.xbar_size
 
                 # find matrix_addr
-                num_matrix = (data_addr / (3*cfg.xbar_size)) % cfg.num_matrix
+                num_matrix = (data_addr // (3*cfg.xbar_size)) % cfg.num_matrix
 
                 # find xbar_type
                 temp_val = (data_addr % (cfg.num_matrix*3*cfg.xbar_size))
@@ -462,7 +466,7 @@ class ima (object):
                 xbar_addr = data_addr % cfg.xbar_size
 
                 # find matrix_addr
-                num_matrix = (data_addr / (1*cfg.xbar_size)) % cfg.num_matrix
+                num_matrix = (data_addr // (1*cfg.xbar_size)) % cfg.num_matrix
 
                 # find xbar_type
                 temp_val = (data_addr % (cfg.num_matrix*1*cfg.xbar_size))
@@ -512,14 +516,15 @@ class ima (object):
                             self.dataMem.write (dst_addr, data[i])
                         except:
                             print(data)
-                            print(len(data))
+                            print((len(data)))
                             print(i)
-                            print(self.ima_id)
-                            print(self.de_d1)
-                            print(self.ex_vec_count)
-                            print(self.de_r1)
-                            print(self.de_r2)
-                            print(self.de_vec)
+                            print((self.ima_id))
+                            print((self.de_d1))
+                            print((self.ex_vec_count))
+                            print((self.de_r1))
+                            print((self.de_r2))
+                            print((self.de_vec))
+                            print((self.mem_interface.wait))
                             assert(0)
                             
                     else:
@@ -534,6 +539,7 @@ class ima (object):
                     dst_addr = self.de_d1 + i
                     if (dst_addr >= datamem_off):
                         self.dataMem.write(addr=dst_addr, data=self.de_val1, type_t='addr') #Updated for separate data_width and addr_width
+
                     else:
                         assert (1==0) # Set instructions cannot write to MVMU storage
                         writeToXbarMem (self, dst_addr, self.de_val1)
@@ -578,9 +584,11 @@ class ima (object):
 
                     # write to dataMem - check if addr is a valid datamem address
                     dst_addr = self.de_d1 + i
+
                     if (dst_addr >= datamem_off):
                         self.dataMem.write (dst_addr, out)
                     else:
+                        assert (0), "ALU instructions cannot write to xbar memory"
                         writeToXbarMem (self, dst_addr, ex_val1)
 
             elif (ex_op == 'alui'):
@@ -603,18 +611,23 @@ class ima (object):
                     if (dst_addr >= datamem_off):
                         self.dataMem.write (dst_addr, out)
                     else:
+                        assert (0), "ALU instructions cannot write to xbar memory"
                         writeToXbarMem (self, dst_addr, ex_val1)
 
             elif (ex_op == 'mvm'):
                 ## Define function to perform inner-product on specified mvmu
                 # Note: Inner product with shift and add (shift-sub with last bit), works for 2s complement
                 # representation for positive and negative numbers
-
+                @profile
                 def inner_product (mat_id, key):
+                    # check the run time
+                    start_time = time.time()
+                    
+
                     # test if this is the tracking xbar
                     tracking_this = False
                     if tracking and (mat_id == track_mat_id) and (key == track_type):
-                        print("Tracking matrix %s, %d, addr = %d" % (key, mat_id, track_addr))
+                        print(("Tracking matrix %s, %d, addr = %d" % (key, mat_id, track_addr)))
                         print('')
                         tracking_this = True
                     
@@ -636,10 +649,39 @@ class ima (object):
                         else:
                             if (sparsity == 100):
                                 sparsity = sparsity-10
+                    
+                    '''
+                    # Quick calculation optimization
+                    # we calculate all the mvm at the same time and let numpy fully use the parallelism
+                    input_list = []
+                    matrix_list_pos = []
+                    matrix_list_neg = []
+                    for k in range (int(math.ceil(cfg.input_prec / cfg.dac_res))):
+                        out_xb_inMem = self.xb_inMem_list[mat_id][key].read (cfg.dac_res)
+                        for m in range (datacfg.ReRAM_xbar_num):
+                            input_list.append(self.dacArray_list[mat_id][key].propagate(out_xb_inMem)) #pass through
+                            [matrix_pos, matrix_neg] = self.matrix_list[mat_id][key][m].get_value()
+                            matrix_list_pos.append(matrix_pos)
+                            matrix_list_neg.append(matrix_neg)
+                    
+                    input_list = np.array(input_list)
+                    matrix_list_pos = np.array(matrix_list_pos)
+                    matrix_list_neg = np.array(matrix_list_neg)
+
+                    result_pos = np.einsum('ij,ijk->ik', input_list, matrix_list_pos)
+                    result_neg = np.einsum('ij,ijk->ik', input_list, matrix_list_neg)
+                    '''
+                    part1_time_list = []
+                    part2_time_list = []
+                    mux_time_list = []
+                    adc_time_list = []
+                    sna1_time_list = []
+                    sna2_time_list = []
 
                     ## Loop to cover all bits of inputs
                     for k in range (int(math.ceil(cfg.input_prec / cfg.dac_res))): #quantization affects the # of streams
                     #for k in range (1):
+                        loop1_checkpoint = time.perf_counter()
                         # read the values from the xbar's input register
                         out_xb_inMem = self.xb_inMem_list[mat_id][key].read (cfg.dac_res)
                         
@@ -656,25 +698,37 @@ class ima (object):
                         out_xbar_neg = [[] for x in range(datacfg.ReRAM_xbar_num)]
                         out_snh_pos = [[] for x in range(datacfg.ReRAM_xbar_num)]
                         out_snh_neg = [[] for x in range(datacfg.ReRAM_xbar_num)]
+
                         for m in range (datacfg.ReRAM_xbar_num):
                             # compute dot-product
                             [out_xbar_pos[m], out_xbar_neg[m]] = self.matrix_list[mat_id][key][m].propagate(out_dac, sparsity)
                             # do sampling
                             self.snh_list_pos[mat_id * datacfg.ReRAM_xbar_num + m].propagate(out_xbar_pos[m])
                             self.snh_list_neg[mat_id * datacfg.ReRAM_xbar_num + m].propagate(out_xbar_neg[m])
+                            #self.snh_list_pos[mat_id * datacfg.ReRAM_xbar_num + m].propagate(result_pos[k * datacfg.ReRAM_xbar_num + m])
+                            #self.snh_list_neg[mat_id * datacfg.ReRAM_xbar_num + m].propagate(result_neg[k * datacfg.ReRAM_xbar_num + m])
                             # reads out from sample&hold 
                             # NOTE: theoretically this should be done in the next loop. to minimize the change and simplify the code I put it here
                             out_snh_pos[m] = self.snh_list_pos[mat_id * datacfg.ReRAM_xbar_num + m].read()
                             out_snh_neg[m] = self.snh_list_neg[mat_id * datacfg.ReRAM_xbar_num + m].read()
 
+                        part1_time = time.perf_counter() - loop1_checkpoint
+                        part1_time_list.append(part1_time)
+                        loop1_checkpoint = time.perf_counter()
+
                         # each of the xbar produce shifted bits of output (weight bits have been distributed)
                         for j in range (cfg.xbar_size): # this 'for' across xbar outs to adc happens via mux
                             out_sna = 0 # a zero for first sna
                             for m in range (datacfg.ReRAM_xbar_num):
+                                loop3_checkpoint = time.perf_counter()
                                 # convert from analog to digital
                                 adc_id = j // cfg.num_column_per_adc
                                 out_mux_pos = self.mux_list[mat_id][key][m][adc_id]['pos'].propagate(out_snh_pos[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
                                 out_mux_neg = self.mux_list[mat_id][key][m][adc_id]['neg'].propagate(out_snh_neg[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
+
+                                mux_time = time.perf_counter() - loop3_checkpoint
+                                mux_time_list.append(mux_time)
+                                loop3_checkpoint = time.perf_counter()
 
                                 out_adc = '0' * cfg.adc_res
                                 if self.adc_type == 'normal':
@@ -685,30 +739,41 @@ class ima (object):
                                 elif self.adc_type == 'differential':
                                     out_adc = self.adc_list[mat_id][key][m][adc_id].propagate(out_mux_pos, out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc)
                                     out_adc = bin2int(out_adc, cfg.adc_res)
+                                
+                                adc_time = time.perf_counter() - loop3_checkpoint
+                                adc_time_list.append(adc_time)
+                                loop3_checkpoint = time.perf_counter()
 
                                 if tracking_this and (j == track_addr):
-                                    print("xbar ID: %d, digit: %d" % (m, k + 1))
-                                    print("out_mux_pos: %f, out_mux_neg: %f" % (out_mux_pos, out_mux_neg))
+                                    print(("xbar ID: %d, digit: %d" % (m, k + 1)))
+                                    print(("out_mux_pos: %f, out_mux_neg: %f" % (out_mux_pos, out_mux_neg)))
                                     if self.adc_type == 'normal':
-                                        print("out_adc_pos: %d, out_adc_neg: %d" % (bin2int(out_adc_pos, 8), bin2int(out_adc_neg, 8)))
-                                    print("out_adc: %f" % out_adc)
-                                    print("value before sna: %f" % out_sna)
+                                        print(("out_adc_pos: %d, out_adc_neg: %d" % (bin2int(out_adc_pos, 8), bin2int(out_adc_neg, 8))))
+                                    print(("out_adc: %f" % out_adc))
+                                    print(("value before sna: %f" % out_sna))
 
                                 # Do the shift and add for mth xbar
                                 [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc, 'sna', datacfg.stored_bit[m], return_type = 'float')
 
+                                sna1_time = time.perf_counter() - loop3_checkpoint
+                                sna1_time_list.append(sna1_time)
+
                                 if tracking_this and (j == track_addr):
-                                    print("value after sna: %f" % out_sna)
+                                    print(("value after sna: %f" % out_sna))
                                     print('')
 
+                            loop2_checkpoint = time.perf_counter()
                             # read from xbar's output register
                             out_xb_outMem = self.xb_outMem_list[mat_id][key].read (j)
                             # shift and add - make a dedicated sna unit -- PENDING
                             [out_sna, ovf] = self.alu_list[0].propagate(out_xb_outMem, out_sna, 'sna', k * cfg.dac_res - datacfg.frac_bits)
 
+                            sna2_time = time.perf_counter() - loop2_checkpoint
+                            sna2_time_list.append(sna2_time)
+
                             if tracking_this and (j == track_addr):
-                                print("before this digit: %f" % fixed2float(out_xb_outMem, datacfg.int_bits, datacfg.frac_bits))
-                                print("after this digit: %f" % fixed2float(out_sna, datacfg.int_bits, datacfg.frac_bits))
+                                print(("before this digit: %f" % fixed2float(out_xb_outMem, datacfg.int_bits, datacfg.frac_bits)))
+                                print(("after this digit: %f" % fixed2float(out_sna, datacfg.int_bits, datacfg.frac_bits)))
                                 print('')
                             if (cfg.debug and ovf):
                                 fid.write ('IMA: ' + str(self.ima_id) + ' ALU Overflow Exception ' +\
@@ -717,8 +782,31 @@ class ima (object):
                             self.xb_outMem_list[mat_id][key].write (out_sna)
                         self.xb_outMem_list[mat_id][key].restart()
 
+                        part2_time = time.perf_counter() - loop1_checkpoint
+                        part2_time_list.append(part2_time)
+
                     # stride the inputs if applicable
                     self.xb_inMem_list[mat_id][key].stride(self.de_val1, self.de_val2)
+
+                    end_time = time.time()
+                    exec_time = end_time - start_time
+                    sum_part1_time = sum(part1_time_list)
+                    sum_part2_time = sum(part2_time_list)
+                    sum_mux_time = sum(mux_time_list)
+                    sum_adc_time = sum(adc_time_list)
+                    sum_sna1_time = sum(sna1_time_list)
+                    sum_sna2_time = sum(sna2_time_list)
+                    '''
+                    print(f"Execution time: {exec_time * 1000}")
+                    print(f"Part 1 time: {sum_part1_time * 1000}")
+                    print(f"Part 2 time: {sum_part2_time * 1000}")
+                    print(f"Mux time: {sum_mux_time * 1000}")
+                    print(f"ADC time: {sum_adc_time * 1000}")
+                    print(f"SNA1 time: {sum_sna1_time * 1000}")
+                    print(f"SNA2 time: {sum_sna2_time * 1000}")
+                    time.sleep(1)
+                    '''
+                    
 
                 ## Define function to perform outer-product on specified mvmu
                 # NOTE: outer_product uses signed magnitude representations for positive and negative numbers
@@ -757,7 +845,7 @@ class ima (object):
                         mask_temp = self.de_xb_nma[i]
                         if (mask_temp[0] == '1'):
                         # foward xbar operation
-                            print ("ima_id: " + str(self.ima_id) + " mat_id: "  + str(i) + " MVM")
+                            #print ("ima_id: " + str(self.ima_id) + " mat_id: "  + str(i) + " MVM")
                             inner_product (i, 'f')
                         if (mask_temp[1] == '1'):
                         #print ("ima_id: " + str(self.ima_id) + " mat_id: "  + str(i) + " MTVM")
@@ -769,7 +857,7 @@ class ima (object):
                 if (cfg.inference):
                    for i in range(cfg.num_matrix):
                        if self.de_xb_nma[i]:
-                           print ("ima_id: " +str(self.ima_id) + " mat_id: "  +str(i) + " MVM")
+                           #print ("ima_id: " +str(self.ima_id) + " mat_id: "  +str(i) + " MVM")
                            inner_product(i,'f')
 
             # TODO for training this need to modify. not supporting negative param yet
@@ -833,7 +921,7 @@ class ima (object):
             d_found = 0
             latency_out_list = []
             for idx, temp in enumerate(mask):
-                print("idx", idx)
+                #print("idx", idx)
                 if ((temp[0] == '1') or (temp[1] == '1')):
                     fb_found += 1
                     #break
@@ -875,10 +963,10 @@ class ima (object):
                 latency_op = lat_temp * num_phase * float(int(d_found>0))
                 ## output latency should be the max of ip/op operation
                 latency_out = max(latency_ip, latency_op)
-                print ("Mask", mask)
-                print ("Latency IP", latency_ip)
-                print ("Latency OP", latency_op)
-                print ("latency_out", latency_out)
+                #print ("Mask", mask)
+                #print ("Latency IP", latency_ip)
+                #print ("Latency OP", latency_op)
+                #print ("latency_out", latency_out)
                 latency_out_list.append(latency_out)
             return max(latency_out_list)
 
@@ -965,8 +1053,8 @@ class ima (object):
                 # (EDRAM + Controller always latency >= 2) - Follow this else deisgn breaks
                 if (ex_op == 'st' and self.stage_latency[sId] == 0):
                     # read the data from dataMem or xb_outMem depending on address
-                    st_data_addr =  self.de_r1 + self.ex_vec_count * (cfg.edram_buswidth/cfg.data_width) # address of data in register
-                    ex_val1 = ['' for num in range (cfg.edram_buswidth/cfg.data_width)] # modified
+                    st_data_addr =  self.de_r1 + self.ex_vec_count * (self.de_r2) # address of data in register HERE!!!
+                    ex_val1 = ['' for num in range (self.de_r2)] # modified
                     if (st_data_addr >= cfg.num_xbar * cfg.xbar_size):
                         for num in range (self.de_r2): # modified
                             ex_val1[num] = self.dataMem.read (st_data_addr+num) # modified
@@ -994,18 +1082,26 @@ class ima (object):
             # Check whether datamem access for st has finished
             elif (self.de_opcode == 'st' and self.stage_cycle[sId] == self.stage_latency[sId]):
                 # read the data from dataMem or xb_outMem depending on address
-                st_data_addr =  self.de_r1 + self.ex_vec_count * (cfg.edram_buswidth/cfg.data_width) # address of data in register
-                ex_val1 = ['' for num in range (cfg.edram_buswidth/cfg.data_width)] # modified
+                st_data_addr =  self.de_r1 + self.ex_vec_count * (self.de_r2) # address of data in register
+                ex_val1 = ['' for num in range (self.de_r2)] # modified
                 if (st_data_addr >= datamem_off):
-                    for num in range (cfg.edram_buswidth / cfg.data_width): # modified
+                    for num in range (self.de_r2): # modified
                         ex_val1[num] = self.dataMem.read (st_data_addr+num) # modified
+                        if len(ex_val1[num]) != cfg.data_width:
+                            print("Error: data width mismatch")
+                            print(("data width: ", len(ex_val1[num])))
+                            print(("st_data_addr: ", st_data_addr))
+                            print(("num: ", num))
+                            print(("ex_val1[num]: ", ex_val1[num]))
+                            print(("IMA ID: ", self.ima_id))
+                            print(("width:", self.de_r2))
+                            assert(0)
                 else:
-                    for num in range (cfg.edram_buswidth / cfg.data_width): # modified
+                    for num in range (self.de_r2): # modified
                         ex_val1[num] = readFromXbarMem (self, st_data_addr+num)
                 # combine counter and data
                 ramstore = [str(self.de_val1), ex_val1[:]] # modified - 1st item in list: counter value, 2nd item: list of values to be written to edram
-                self.mem_interface.wrRequest (self.de_d1 + \
-                        self.ex_vec_count * self.de_r2, ramstore, self.de_r2)
+                self.mem_interface.wrRequest (self.de_d1 + self.ex_vec_count * self.de_r2, ramstore, self.de_r2)
                 # to make sure st looks for memwait after datamem read
                 self.stage_cycle[sId] = self.stage_cycle[sId] + 1
 

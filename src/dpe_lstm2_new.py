@@ -21,17 +21,17 @@
 import sys, getopt, os
 
 import torchfile as tf
-from data_convert import *
-from node_dump import *
+from .data_convert import *
+from .node_dump import *
 import numpy as np
 
 import constants as param
-import ima_modules
-import ima
-import tile_modules
-import tile
-import node_modules
-import node
+from . import ima_modules
+from . import ima
+from . import tile_modules
+from . import tile
+from . import node_modules
+from . import node
 
 
 ## Set the instruction & trace paths (create the folder hierarchy)
@@ -71,7 +71,7 @@ node_dut.node_init (instrnpath, tracepath)
 ## Read the input data (input.t7) into the input tile's edram(controller)
 inp_filename = instrnpath + 'input.t7'
 inp_tileId = 0
-print (os.path.exists (inp_filename))
+print((os.path.exists (inp_filename)))
 assert (os.path.exists (inp_filename) == True), 'Input Error: Provide inputbefore running the DPE'
 inp = tf.load (inp_filename)
 for i in range (len(inp.data)):
@@ -84,9 +84,9 @@ for i in range (len(inp.data)):
 ## Program DNN weights on the xbars
 # torch table in file - (tracepath/tile<>/weights/ima<>_xbar<>.t7)
 for i in range (1, param.num_tile-1):
-    print ('Programming tile no: ', i)
+    print(('Programming tile no: ', i))
     for j in range (param.num_ima):
-        print ('Programming ima no: ', j)
+        print(('Programming ima no: ', j))
         for k in range (param.num_xbar):
             wt_filename = instrnpath + 'tile' + str(i) + '/weights/' + \
                         'ima' + str(j) + '_xbar' + str(k) + '.t7'
@@ -100,7 +100,7 @@ cycle = 0
 while (not node_dut.node_halt and cycle < param.cycles_max):
     node_dut.node_run (cycle)
     cycle = cycle + 1
-print 'Finally node halted' + ' | PS: max_cycles ' + str (param.cycles_max)
+print('Finally node halted' + ' | PS: max_cycles ' + str (param.cycles_max))
 
 
 ## For DEBUG only - dump the contents of all tiles
@@ -115,7 +115,7 @@ fid = open (output_file, 'w')
 tile_id  = param.num_tile - 1
 mem_dump (fid, node_dut.tile_list[tile_id].edram_controller.mem.memfile, 'EDRAM')
 fid.close ()
-print 'Output Tile dump finished'
+print('Output Tile dump finished')
 
 
 ## Dump the harwdare access traces (For now - later upgrade to actual energy numbers)
@@ -172,9 +172,9 @@ for i in range (1, param.num_tile-1): # ignore dummy (input & output) tiles
             hw_comp['xbOutmem'] += node_dut.tile_list[i].ima_list[j].xb_outMem_list[k].num_access
 
 # Write the dict components to a file for visualization
-for key, value in hw_comp.items():
+for key, value in list(hw_comp.items()):
     fid.write (key + ': ')
     fid.write (str(value) + '\n')
 fid.close ()
-print 'Success: Hadrware results compiled!!'
+print('Success: Hadrware results compiled!!')
 

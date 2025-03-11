@@ -33,7 +33,6 @@ simulator_dir = os.path.join(root_dir, "srcs/Hybrid-CiM-Simulator")
 data_dir = os.path.join(root_dir, "data")
 src_dir = os.path.join(simulator_dir, "src")
 include_dir = os.path.join(simulator_dir, "include")
-test_dir = os.path.join(data_dir, "test")
 security_dir=os.path.join(root_dir, "Security")
 
 sys.path.insert(1, security_dir)
@@ -63,12 +62,11 @@ import ima_metrics
 import tile_metrics
 import node_metrics
 import dnn_wt_p
-from Factory import Factory
 
 
 
-compiler_path = os.path.join(data_dir, "test/testasm/")
-trace_path = os.path.join(data_dir, "test/traces/")
+compiler_path = os.path.join(data_dir, "testasm/")
+trace_path = os.path.join(data_dir, "traces/")
 
 
 
@@ -76,13 +74,11 @@ trace_path = os.path.join(data_dir, "test/traces/")
 
 class DPE:
 
-    def run(self, net, inp_path):
-        print(test_dir)
+    def run(self, net, inp):
         instrndir = compiler_path + net
-        #tracedir = os.path.join(os.path.join(test_dir, 'traces'), net.split('/')[-1])
         tracedir = trace_path + net
-        print("Inst directory: ", instrndir)
-        print("Trace directory: ", tracedir)
+        print(("Inst directory: ", instrndir))
+        print(("Trace directory: ", tracedir))
 
         if cfg.authenticated:
             f = Factory()
@@ -137,9 +133,7 @@ class DPE:
         assert (os.path.exists(instrndir+'/'+'tile0')
                 ), 'Input Error: Provide input before running the DPE'
   
-            
-        inp = np.load(inp_path, allow_pickle=True).item()
-        print ('length of input data:', len(inp['data']))
+        print(('length of input data:', len(inp['data'])))
         for i in range(len(inp['data'])):
             data = float2fixed(inp['data'][i], datacfg.int_bits, datacfg.frac_bits)
             node_dut.tile_list[inp_tileId].edram_controller.mem.memfile[i] = data
@@ -157,6 +151,7 @@ class DPE:
         start = time.time()
         while (not node_dut.node_halt and cycle < cfg.cycles_max):
             node_dut.node_run(cycle)
+            print(('Cycle: ', cycle, 'Tile halt list', node_dut.tile_halt_list))
             '''
             if (cfg.debug):
                 tracedir_cycle = self.tracepath + str(cycle)
@@ -172,7 +167,7 @@ class DPE:
             
 
         end = time.time()
-        print ('simulation time: ' + str(end-start) + 'secs')
+        print(('simulation time: ' + str(end-start) + 'secs'))
 
         # For DEBUG only - dump the contents of all tiles
         # NOTE: Output and input tiles are dummy tiles to enable self-contained simulation
@@ -200,7 +195,6 @@ class DPE:
         fid.close()
         print('Success: Hardware results compiled!!')
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -226,13 +220,15 @@ if __name__ == '__main__':
     else:
         model_path = os.path.join(compiler_path,net)
     
-    inp_path = '/HybridCiM/data/test/dataset/default_input.npy'
+    inp_path = '/HybridCiM/data/dataset/default_input.npy'
+    inp = np.load(inp_path, allow_pickle=True, encoding='latin1').item()
+    inp['data'] = quantize_to_fixed(inp['data'])
     
     #print(cfg.num_tile)
     #print(cfg.encrypted)
     #print(cfg.cypher_name)
    
-    print('Input net is {}'.format(net))
+    print(('Input net is {}'.format(net)))
     #print(compiler_path)
-    DPE().run(net, inp_path)
+    DPE().run(net, inp)
     

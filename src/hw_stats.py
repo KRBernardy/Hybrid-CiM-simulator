@@ -170,7 +170,7 @@ def get_hw_stats (fid, node_dut, cycle):
                         elif (mvmu_t == 'b'):
                             hw_comp_access['xbar_mtvm'] += node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][0].num_access['0']
                         else:
-                            for key,value in hw_comp_access['xbar_mvm'].items():
+                            for key,value in list(hw_comp_access['xbar_mvm'].items()):
                                 hw_comp_access['xbar_mvm'][key] += node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][0].num_access[key]
                         hw_comp_access['xbar_rd'] += \
                         node_dut.tile_list[i].ima_list[j].matrix_list[k][mvmu_t][0].num_access_rd / (cfg.xbar_size**2)
@@ -201,7 +201,7 @@ def get_hw_stats (fid, node_dut, cycle):
             for mat_id in range(cfg.num_matrix):
                 for key in ['f', 'b']:
                     for xbar_id in range(datacfg.ReRAM_xbar_num):
-                        for mux_id in range(cfg.num_mux_per_xbar / 2): # positive and negative muxes share the same mux_id
+                        for mux_id in range(cfg.num_mux_per_xbar // 2): # positive and negative muxes share the same mux_id
                             for pos_neg in ['pos', 'neg']:
                                 hw_comp_access['mux'] += node_dut.tile_list[i].ima_list[j].mux_list[mat_id][key][xbar_id][mux_id][pos_neg].num_access
 
@@ -210,13 +210,13 @@ def get_hw_stats (fid, node_dut, cycle):
                     for key in ['f', 'b']:
                         for xbar_id in range(datacfg.ReRAM_xbar_num):
                             if cfg.adc_type == 'normal':
-                                for adc_id in range(cfg.num_adc_per_xbar / 2): # positive and negative adcs share the same adc_id
-                                    for key1, value in hw_comp_access['adc'].items():
+                                for adc_id in range(cfg.num_adc_per_xbar // 2): # positive and negative adcs share the same adc_id
+                                    for key1, value in list(hw_comp_access['adc'].items()):
                                         hw_comp_access['adc'][key1] += node_dut.tile_list[i].ima_list[j].adc_list[mat_id][key][xbar_id][adc_id]['pos'].num_access[key1]
                                         hw_comp_access['adc'][key1] += node_dut.tile_list[i].ima_list[j].adc_list[mat_id][key][xbar_id][adc_id]['neg'].num_access[key1]
                             elif cfg.adc_type == 'differential':
                                 for adc_id in range(cfg.num_adc_per_xbar):
-                                    for key1, value in hw_comp_access['adc'].items():
+                                    for key1, value in list(hw_comp_access['adc'].items()):
                                         hw_comp_access['adc'][key1] += node_dut.tile_list[i].ima_list[j].adc_list[mat_id][key][xbar_id][adc_id].num_access[key1]
 
             for k in range (cfg.num_ALU):
@@ -248,34 +248,34 @@ def get_hw_stats (fid, node_dut, cycle):
     total_mvm_access = 0
     # Compute the total dynamic energy consumption
     if cfg.MVMU_ver == "Analog":
-        for key, value in hw_comp_access.items():
+        for key, value in list(hw_comp_access.items()):
             if key == 'xbar_mvm':
                 for bits_per_cell in range(1, 9):
-                    for key1, value1 in hw_comp_access['xbar_mvm'][str(bits_per_cell)].items():
+                    for key1, value1 in list(hw_comp_access['xbar_mvm'][str(bits_per_cell)].items()):
                         total_energy += value1 * hw_comp_energy['xbar_mvm'][str(bits_per_cell)][key1]
                         total_mvm_energy +=  value1*hw_comp_energy['xbar_mvm'][str(bits_per_cell)][key1] # Not needed for function but for output visualisation
                         total_mvm_access += value1
             elif key in ['adc', 'xbar_op', 'xbar_mtvm', 'xbar_rd', 'xbar_wr']:
-                for key1, value1 in hw_comp_access[key].items():
+                for key1, value1 in list(hw_comp_access[key].items()):
                     total_energy += value1 * hw_comp_energy[key][key1]
                     total_part_energy[key] += value1 * hw_comp_energy[key][key1]
                     total_part_access[key] += value1
             else:
                 total_energy += value * hw_comp_energy[key]
     else:
-        for key, value in hw_comp_access.items():
+        for key, value in list(hw_comp_access.items()):
             if key == 'adc':
-                for key1, value1 in hw_comp_access['adc'].items():
+                for key1, value1 in list(hw_comp_access['adc'].items()):
                     total_energy += value1*hw_comp_energy['adc'][key1]
                     total_adc_energy +=  value1*hw_comp_energy['adc'][key1] # Not needed for function but for output visualisation
                     total_adc_access += value1
             elif key == 'xbar_mvm':
-                for key1, value1 in hw_comp_access['xbar_mvm'].items():
+                for key1, value1 in list(hw_comp_access['xbar_mvm'].items()):
                     total_energy += (value1/16)*hw_comp_energy['xbar_mvm'][key1]
                     total_mvm_energy +=  (value1/16)*hw_comp_energy['xbar_mvm'][key1] # Not needed for function but for output visualisation
                     total_mvm_access += (value1/16)
             elif key == 'xbar_op' :
-                for bits_per_cell, value1 in hw_comp_access[key].items():
+                for bits_per_cell, value1 in list(hw_comp_access[key].items()):
                     total_energy += value1 * hw_comp_energy[key][bits_per_cell]
             else:
                 total_energy += value * hw_comp_energy[key]
@@ -284,7 +284,7 @@ def get_hw_stats (fid, node_dut, cycle):
     fid.write ("MVMU Type : " + cfg.MVMU_ver + "\n")
     fid.write ('Access and energy distribution of dynamic energy: \n')
     fid.write ('Component                 num_access              percent\n')
-    for key, value in hw_comp_access.items():
+    for key, value in list(hw_comp_access.items()):
         # put extra spaces for better visulalization of values
         bl_spc1 = (28-len(key)) * ' '
         # bl_spc2 = (22-len(str(value))) * ' '
@@ -339,7 +339,7 @@ def get_hw_stats (fid, node_dut, cycle):
     metric_dict['total_energy'] = metric_dict['dynamic_energy'] + metric_dict['leakage_energy']
     metric_dict['average_power'] = metric_dict['total_energy'] / metric_dict['time'] * (10**(3)) # in mW
 
-    for key, value in metric_dict.items():
+    for key, value in list(metric_dict.items()):
         fid.write (key + ': ' + str (value) + '\n')
 
     packet_inj_rate = node_dut.noc.num_access_intra/ (metric_dict['cycles'] * cfg.num_inj_max)
@@ -352,13 +352,13 @@ def get_hw_stats (fid, node_dut, cycle):
 def get_hw_area (fid):
     sum_area = 0
     area_percent = hw_comp_area.copy()
-    for key, value in hw_comp_area.items():
+    for key, value in list(hw_comp_area.items()):
         sum_area += value
-    for key, value in area_percent.items():
+    for key, value in list(area_percent.items()):
         area_percent[key] = value / sum_area * 100
     fid.write ('Area distribution: \n')
     fid.write ('Component                 area(mm2)              percent\n')
-    for key, value in hw_comp_area.items():
+    for key, value in list(hw_comp_area.items()):
         # put extra spaces for better visulalization of values
         bl_spc1 = (28-len(key)) * ' '
         bl_spc2 = (22-len(str(value))) * ' '

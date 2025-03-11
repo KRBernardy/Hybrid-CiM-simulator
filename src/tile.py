@@ -3,7 +3,7 @@
 import sys, json
 sys.path.insert (0, '/home/aa/dpe_emulate/include')
 
-import Queue
+import queue
 
 import numpy as np
 import config as cfg
@@ -44,7 +44,7 @@ class tile (object):
 
         ## Book-keeping variables (may not have a harwdare relevance)
         # send_queue - part of NOC that connects the tiles
-        self.send_queue = Queue.Queue()
+        self.send_queue = queue.Queue()
         # track instruction being executed hasn't completed yet or not
         self.stall = 0
         # latch tag_hit and data (prevents unnecessary repeated buff accesses)
@@ -89,7 +89,7 @@ class tile (object):
             self.ima_list[i].pipe_init (instrnfile, self.fid_list[i])
 
         # Initialize the EDRAM - invalidate all entries (valid_list)
-        self.edram_controller.valid = [0] * (cfg.edram_size*1024*8/(cfg.data_width))
+        self.edram_controller.valid = [0] * (cfg.edram_size * 1024 * 8 // (cfg.data_width))
 
         # Intiialize the receive buffer - invalidate
         self.receive_buffer.inv ()
@@ -130,6 +130,7 @@ class tile (object):
             wr_width_list[i] = self.ima_list[i].mem_interface.wr_width
             addr_list[i] = self.ima_list[i].mem_interface.addr
             ramstore_list[i] = self.ima_list[i].mem_interface.ramstore
+
 
         # Invoke memory request if memory is free
         if (self.memstate == 'free' and self.stage_cycle == 0 and (any (ren_list) or any (wen_list))):

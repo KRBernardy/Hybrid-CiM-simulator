@@ -88,8 +88,8 @@ def eval (in1, in2, wt):
 
     outer_prod (wt_slice, in1_fixed, in2_fixed, sub)
     val = crs (wt_slice)
-    print ('val_exp', wt+in1*in2)
-    print ('val_out', val)
+    print(('val_exp', wt+in1*in2))
+    print(('val_out', val))
 
 
 ## testcases

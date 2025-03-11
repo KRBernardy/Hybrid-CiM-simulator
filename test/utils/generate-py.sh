@@ -9,7 +9,7 @@ if [[ $SIMULATOR_PATH == "" ]] ; then
 fi
 
 
-PYTHON=python2
+PYTHON=python3
 
 for g in *.puma; do
     echo $g

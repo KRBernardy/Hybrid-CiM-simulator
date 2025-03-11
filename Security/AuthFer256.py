@@ -58,7 +58,7 @@ class AuthFer256(IAuth):
         f.write(token)
         f.close()
         final_time = time.time() - init_time 
-        print("Finished MAC generation in " + "{0:.4f}".format(final_time) + " seconds") 
+        print(("Finished MAC generation in " + "{0:.4f}".format(final_time) + " seconds")) 
         
     #Generate the MAC for the input file using SHA256 
     def generateMACInput(self,path): 
@@ -78,7 +78,7 @@ class AuthFer256(IAuth):
         f.write(token)
         f.close()
         final_time = time.time() - init_time 
-        print("Finished MAC generation in " + "{0:.4f}".format(final_time) + " seconds") 
+        print(("Finished MAC generation in " + "{0:.4f}".format(final_time) + " seconds")) 
 
     #Goes through the directories generating a Hash that is then compared to the MAC which is decrypted from the file  
     def authenticateModel(self,path):
@@ -106,7 +106,7 @@ class AuthFer256(IAuth):
       
         decriptedmessage=f.decrypt(sign)
         final_time = time.time() - init_time 
-        print("Finished Model Authentication in " + "{0:.4f}".format(final_time) + " seconds") 
+        print(("Finished Model Authentication in " + "{0:.4f}".format(final_time) + " seconds")) 
         if(decriptedmessage==hashed):
           return(True)
         return(False)
@@ -128,7 +128,7 @@ class AuthFer256(IAuth):
     
         decriptedmessage=f.decrypt(sign)
         final_time = time.time() - init_time 
-        print("Finished Input Authentication in " + "{0:.4f}".format(final_time) + " seconds") 
+        print(("Finished Input Authentication in " + "{0:.4f}".format(final_time) + " seconds")) 
         if(decriptedmessage==hashed):
             return(True)
         return(False)

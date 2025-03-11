@@ -8,7 +8,7 @@ import sys
 import numpy as np
 import include.constants as param
 import include.config as cfg
-from include.data_config import datacfg
+from include.data_config import datacfg, max_val, min_val
 import math
 from data_convert import *
 
@@ -56,8 +56,15 @@ class xbar (object):
         return str(self.bits_per_cell)
 
     def get_value(self):
-        print(self.xbar_value_pos)
-        print(self.xbar_value_neg)
+        # This function is used to get the xbar value for quick calculation
+        noise_pos = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
+        value_with_noise_pos = self.xbar_value_pos + noise_pos
+        value_with_noise_pos[value_with_noise_pos < 0] = 0 # conductance should not be negative, set all negataive values 0
+
+        noise_neg = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
+        value_with_noise_neg = self.xbar_value_neg + noise_neg
+        value_with_noise_neg[value_with_noise_neg < 0] = 0 # conductance should not be negative, set all negataive values 0
+        return [value_with_noise_pos, value_with_noise_neg]
 
     # programs the entire xbar during configuration phase
     def program (self, xbar_value = ''):
@@ -129,12 +136,16 @@ class xbar (object):
             out_pos = np.dot(inp, self.xbar_value_pos)
             out_neg = np.dot(inp, self.xbar_value_neg)
         else:
-            noise_pos = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
-            out_pos = np.dot(inp, self.xbar_value_pos + noise_pos)
-            noise_neg = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
-            out_neg = np.dot(inp, self.xbar_value_neg + noise_neg)
-            out_pos[out_pos < 0] = 0 #conductance should not be negative, set all negataive values 0
-            out_neg[out_neg < 0] = 0
+            rng = np.random.default_rng()
+            noise_pos = rng.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
+            value_with_noise_pos = self.xbar_value_pos + noise_pos
+            value_with_noise_pos[value_with_noise_pos < 0] = 0 # conductance should not be negative, set all negataive values 0
+            out_pos = np.dot(inp, value_with_noise_pos)
+
+            noise_neg = rng.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
+            value_with_noise_neg = self.xbar_value_neg + noise_neg
+            value_with_noise_neg[value_with_noise_neg < 0] = 0 # conductance should not be negative, set all negataive values 0
+            out_neg = np.dot(inp, value_with_noise_neg)
         self.record([out_pos, out_neg])
         return [out_pos, out_neg]
 
@@ -303,8 +314,8 @@ class adc (object):
             assert(int_value < num_levels)
         except AssertionError:
             print("ADC overflow")
-            print("int_value: ", int_value)
-            print("num_levels: ", num_levels)
+            print(("int_value: ", int_value))
+            print(("num_levels: ", num_levels))
             sys.exit(1)
         bin_value = bin(int_value)[2:]
         return ('0'*(num_bits - len(bin_value)) + bin_value)
@@ -397,8 +408,8 @@ class differential_adc (object):
             assert(abs(int_value) < num_levels)
         except AssertionError:
             print("ADC overflow")
-            print("int_value: ", int_value)
-            print("num_levels: ", num_levels)
+            print(("int_value: ", int_value))
+            print(("num_levels: ", num_levels))
             sys.exit(1)
         bin_value = bin(abs(int_value))[2:]
         bin_value = ('0' * (num_bits - len(bin_value)) + bin_value)
@@ -552,7 +563,7 @@ class alu (object):
         return self.latency
 
     def propagate (self, a, b, aluop, c = 0, return_type = 'fixed'): # c can be shift operand for sna operation (add others later)
-        assert ((type(aluop) == str) and (aluop in self.options.keys())), 'Invalid alu_op'
+        assert ((type(aluop) == str) and (aluop in list(self.options.keys()))), 'Invalid alu_op'
         assert (type(c) == int or (type(c) == str and len(c) == datacfg.num_bits)), 'ALU sna: shift = int/ num_bit str'
         assert (return_type == 'fixed' or return_type == 'float'), "return_type can only be 'fixed' or 'float'"
         if (type(c) == str):
@@ -576,6 +587,7 @@ class alu (object):
                     b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
         out = self.options[aluop] (a, b)
         # overflow needs to be detected while conversion
+        assert (out <= max_val), 'ALU overflow'
         ovf = 0
         if (return_type == 'fixed'):
             out = float2fixed (out, datacfg.int_bits, datacfg.frac_bits)
@@ -586,7 +598,7 @@ class alu (object):
     # here float to fixed conversion of xbar output (and subsequent alu.propagate) cannot be used
     # unless np.dot is implement using fixed point computation
     def propagate_float (self, a, b, aluop, c=0):
-        assert ((type(aluop) == str) and (aluop in self.options.keys())), 'Invalid alu_op'
+        assert ((type(aluop) == str) and (aluop in list(self.options.keys()))), 'Invalid alu_op'
         assert (type(c) == int or (type(c) == str and len(c) == cfg.num_bits)), 'ALU sna: shift = int/ num_bit str'
         if (type(c) == str):
             c = bin2int (c, cfg.num_bits)
@@ -639,7 +651,7 @@ class alu_int (object):
         return self.latency
 
     def propagate (self, a, b, aluop):
-        assert ((type(aluop) == str) and (aluop in self.options.keys())), 'Invalid alu_op'
+        assert ((type(aluop) == str) and (aluop in list(self.options.keys()))), 'Invalid alu_op'
         a = bin2int (a, cfg.num_bits)
         b = bin2int (b, cfg.num_bits)
         out = self.options[aluop] (a, b)
@@ -683,12 +695,7 @@ class memory (object):
         #assert ((type(data) ==  str) and (len(data) == cfg.data_width)), 'data should be a string with mem_width bits'
         assert ((type(data) == str) and ((type_t == 'data')) or (type_t == 'addr')) # UPDATE - Pointer/address for LD/ST written by previous SET instrn. can be larger than data_width
         if (type_t == 'data'):
-            try: 
-                assert (len(data) == cfg.data_width)
-		        #print("I am here!!")
-            except AssertionError:
-                print("Warning: Data width received is not-coherent, NEEDS DEBUGGING")
-            data = data[0:16]
+            assert (len(data) == cfg.data_width)
         else:
             assert (len(data) == cfg.addr_width) # Specification for pointer (or addres type data)
         self.memfile[addr - self.addr_start] = data
@@ -840,7 +847,7 @@ class instrn_memory (memory):
     # To initilzie the memory with instructions
     def load (self, dict_list):
         if (len(dict_list) > self.size):
-            print ('instruction memory size requirement', len(dict_list), self.size)
+            print(('instruction memory size requirement', len(dict_list), self.size))
         assert (len(dict_list) <= self.size), 'instructions exceed the instruction memory size'
         for i in range(len(dict_list)):
             self.memfile[i] = dict_list[i]
@@ -916,3 +923,24 @@ class mem_interface (object):
         ## For DEBUG of IMA only
         #self.ramload = self.edram.memfile[addr]
 
+'''
+class MemRequestType(Enum):
+    READ = 1
+    WRITE = 2
+    ALLOC = 3
+    FREE = 4
+
+class MemoryRequest:
+    def __init__(self, 
+                 req_type: MemRequestType,
+                 core_id: int,
+                 block_addr: Optional[int] = None,
+                 data: Optional[bytes] = None,
+                 size: int = 0):
+        self.req_type = req_type
+        self.core_id = core_id
+        self.block_addr = block_addr
+        self.data = data
+        self.size = size
+        self.timestamp = 0
+'''

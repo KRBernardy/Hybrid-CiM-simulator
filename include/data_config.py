@@ -31,7 +31,7 @@ class num_config:
 
 
 
-# Change here to use different data config. 
+# Change here to use different data config.
 # the first param indicates how data is stored.
 # the second param indicates how many int_bits are included.
 # e.g. ['2', '2', '2', '2', '2', '1', '1', 's', 's', 's', 's'], 12: 
@@ -45,3 +45,6 @@ datacfg_list = [num_config(['2', '2', '2', '2', '2', '2', '2', '2'], 8),
                 num_config(['4', '2', '2', '2', '2', '1', '1', '1', '1'], 8)]
 
 datacfg = datacfg_list[0]
+
+max_val = 2.0 ** (datacfg.int_bits - 1) - 1.0 / (2.0 ** datacfg.frac_bits)
+min_val = -2.0 ** (datacfg.int_bits - 1)

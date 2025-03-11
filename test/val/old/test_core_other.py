@@ -87,9 +87,9 @@ if (inst_refresh):
     i_temp = i_hlt()
     dict_list.append (i_temp.copy())
 
-    print (inst_file + ' generated...')
+    print((inst_file + ' generated...'))
     np.save (inst_file, dict_list)
-    print ('Total no. of instructions: ', len(dict_list))
+    print(('Total no. of instructions: ', len(dict_list)))
 
 
 ## Simulate core
