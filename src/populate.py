@@ -3,7 +3,7 @@ import os
 import numpy as np
 import argparse
 
-SIMULATOR_PATH="/HybridCiM/srcs/Hybrid-CiM-Simulator"
+SIMULATOR_PATH="/HybridCiM/srcs/Hybrid-CiM-simulator"
 sys.path.insert (0, SIMULATOR_PATH + '/include/')
 sys.path.insert (0, SIMULATOR_PATH + '/src/') 
 sys.path.insert (0, SIMULATOR_PATH +'/')

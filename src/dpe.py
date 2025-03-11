@@ -29,7 +29,7 @@ import subprocess
 
 
 root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-simulator_dir = os.path.join(root_dir, "srcs/Hybrid-CiM-Simulator")
+simulator_dir = os.path.join(root_dir, "srcs/Hybrid-CiM-simulator")
 data_dir = os.path.join(root_dir, "data")
 src_dir = os.path.join(simulator_dir, "src")
 include_dir = os.path.join(simulator_dir, "include")

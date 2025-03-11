@@ -1,7 +1,7 @@
 # Copy this file to compiler test folder where the .npy files are generated.
 # Update SIMULATOR_PATH value and execute it.
 
-SIMULATOR_PATH="/HybridCiM/srcs/Hybrid-CiM-Simulator" # simulator root path
+SIMULATOR_PATH="/HybridCiM/srcs/Hybrid-CiM-simulator" # simulator root path
 
 # Check if directory argument is provided
 if [ "$#" -ne 1 ]; then
