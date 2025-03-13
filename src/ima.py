@@ -336,6 +336,7 @@ class ima (object):
                 self.de_d1 = self.fd_instrn['d1'] # addr for rf
                 self.de_val1 = self.fd_instrn['imm'] #absolute value (shift)
                 self.de_vec = self.fd_instrn['vec']
+                self.de_r1 = self.fd_instrn['r1'] # is address or data? address = 1, data = 0
 
             elif (dec_op == 'alu'):
                 self.de_aluop = self.fd_instrn['aluop']
@@ -534,15 +535,17 @@ class ima (object):
                 return 1
 
             elif (ex_op == 'set'):
+                # Updated for separate data_width and addr_width
+                assert(self.de_d1 >= datamem_off), "set instruction cannot write to MVMU buffer"
+                set_type = 'addr' if self.de_r1 else 'data'
+                value=self.de_val1
+                if set_type == 'data':
+                    value = float2fixed(value, datacfg.int_bits, datacfg.frac_bits)
                 for i in range (self.de_vec):
                     # write to dataMem - check if addr is a valid datamem address
                     dst_addr = self.de_d1 + i
-                    if (dst_addr >= datamem_off):
-                        self.dataMem.write(addr=dst_addr, data=self.de_val1, type_t='addr') #Updated for separate data_width and addr_width
-
-                    else:
-                        assert (1==0) # Set instructions cannot write to MVMU storage
-                        writeToXbarMem (self, dst_addr, self.de_val1)
+                    assert(dst_addr < cfg.dataMem_size), "Exceeded Data Memory Size"
+                    self.dataMem.write(addr=dst_addr, data=value, type_t=set_type)
 
             elif (ex_op == 'cp'):
                 for i in range (self.de_vec):
