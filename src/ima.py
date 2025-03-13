@@ -620,10 +620,6 @@ class ima (object):
                 # representation for positive and negative numbers
                 @profile
                 def inner_product (mat_id, key):
-                    # check the run time
-                    start_time = time.time()
-                    
-
                     # test if this is the tracking xbar
                     tracking_this = False
                     if tracking and (mat_id == track_mat_id) and (key == track_type):
@@ -671,17 +667,10 @@ class ima (object):
                     result_pos = np.einsum('ij,ijk->ik', input_list, matrix_list_pos)
                     result_neg = np.einsum('ij,ijk->ik', input_list, matrix_list_neg)
                     '''
-                    part1_time_list = []
-                    part2_time_list = []
-                    mux_time_list = []
-                    adc_time_list = []
-                    sna1_time_list = []
-                    sna2_time_list = []
 
                     ## Loop to cover all bits of inputs
                     for k in range (int(math.ceil(cfg.input_prec / cfg.dac_res))): #quantization affects the # of streams
                     #for k in range (1):
-                        loop1_checkpoint = time.perf_counter()
                         # read the values from the xbar's input register
                         out_xb_inMem = self.xb_inMem_list[mat_id][key].read (cfg.dac_res)
                         
@@ -712,23 +701,23 @@ class ima (object):
                             out_snh_pos[m] = self.snh_list_pos[mat_id * datacfg.ReRAM_xbar_num + m].read()
                             out_snh_neg[m] = self.snh_list_neg[mat_id * datacfg.ReRAM_xbar_num + m].read()
 
-                        part1_time = time.perf_counter() - loop1_checkpoint
-                        part1_time_list.append(part1_time)
-                        loop1_checkpoint = time.perf_counter()
-
                         # each of the xbar produce shifted bits of output (weight bits have been distributed)
                         for j in range (cfg.xbar_size): # this 'for' across xbar outs to adc happens via mux
                             out_sna = 0 # a zero for first sna
                             for m in range (datacfg.ReRAM_xbar_num):
-                                loop3_checkpoint = time.perf_counter()
                                 # convert from analog to digital
                                 adc_id = j // cfg.num_column_per_adc
-                                out_mux_pos = self.mux_list[mat_id][key][m][adc_id]['pos'].propagate(out_snh_pos[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
-                                out_mux_neg = self.mux_list[mat_id][key][m][adc_id]['neg'].propagate(out_snh_neg[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
 
-                                mux_time = time.perf_counter() - loop3_checkpoint
-                                mux_time_list.append(mux_time)
-                                loop3_checkpoint = time.perf_counter()
+                                # The commanted code below is the original code, shows how hardwarw should work
+                                # Here to make the code run faster, we directly use the output of SNH.
+                                # This is not the exact hardware behaviour, but it should work exactly the same
+                                # Also use propagate_dummy to count the times mux is called
+                                #out_mux_pos = self.mux_list[mat_id][key][m][adc_id]['pos'].propagate(out_snh_pos[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
+                                #out_mux_neg = self.mux_list[mat_id][key][m][adc_id]['neg'].propagate(out_snh_neg[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
+                                out_mux_pos = out_snh_pos[m][j]
+                                out_mux_neg = out_snh_neg[m][j]
+                                self.mux_list[mat_id][key][m][adc_id]['pos'].propagate_dummy()
+                                self.mux_list[mat_id][key][m][adc_id]['neg'].propagate_dummy()
 
                                 out_adc = '0' * cfg.adc_res
                                 if self.adc_type == 'normal':
@@ -739,10 +728,6 @@ class ima (object):
                                 elif self.adc_type == 'differential':
                                     out_adc = self.adc_list[mat_id][key][m][adc_id].propagate(out_mux_pos, out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc)
                                     out_adc = bin2int(out_adc, cfg.adc_res)
-                                
-                                adc_time = time.perf_counter() - loop3_checkpoint
-                                adc_time_list.append(adc_time)
-                                loop3_checkpoint = time.perf_counter()
 
                                 if tracking_this and (j == track_addr):
                                     print(("xbar ID: %d, digit: %d" % (m, k + 1)))
@@ -755,9 +740,6 @@ class ima (object):
                                 # Do the shift and add for mth xbar
                                 [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc, 'sna', datacfg.stored_bit[m], return_type = 'float')
 
-                                sna1_time = time.perf_counter() - loop3_checkpoint
-                                sna1_time_list.append(sna1_time)
-
                                 if tracking_this and (j == track_addr):
                                     print(("value after sna: %f" % out_sna))
                                     print('')
@@ -767,9 +749,6 @@ class ima (object):
                             out_xb_outMem = self.xb_outMem_list[mat_id][key].read (j)
                             # shift and add - make a dedicated sna unit -- PENDING
                             [out_sna, ovf] = self.alu_list[0].propagate(out_xb_outMem, out_sna, 'sna', k * cfg.dac_res - datacfg.frac_bits)
-
-                            sna2_time = time.perf_counter() - loop2_checkpoint
-                            sna2_time_list.append(sna2_time)
 
                             if tracking_this and (j == track_addr):
                                 print(("before this digit: %f" % fixed2float(out_xb_outMem, datacfg.int_bits, datacfg.frac_bits)))
@@ -782,31 +761,10 @@ class ima (object):
                             self.xb_outMem_list[mat_id][key].write (out_sna)
                         self.xb_outMem_list[mat_id][key].restart()
 
-                        part2_time = time.perf_counter() - loop1_checkpoint
-                        part2_time_list.append(part2_time)
-
                     # stride the inputs if applicable
                     self.xb_inMem_list[mat_id][key].stride(self.de_val1, self.de_val2)
 
-                    end_time = time.time()
-                    exec_time = end_time - start_time
-                    sum_part1_time = sum(part1_time_list)
-                    sum_part2_time = sum(part2_time_list)
-                    sum_mux_time = sum(mux_time_list)
-                    sum_adc_time = sum(adc_time_list)
-                    sum_sna1_time = sum(sna1_time_list)
-                    sum_sna2_time = sum(sna2_time_list)
-                    '''
-                    print(f"Execution time: {exec_time * 1000}")
-                    print(f"Part 1 time: {sum_part1_time * 1000}")
-                    print(f"Part 2 time: {sum_part2_time * 1000}")
-                    print(f"Mux time: {sum_mux_time * 1000}")
-                    print(f"ADC time: {sum_adc_time * 1000}")
-                    print(f"SNA1 time: {sum_sna1_time * 1000}")
-                    print(f"SNA2 time: {sum_sna2_time * 1000}")
-                    time.sleep(1)
-                    '''
-                    
+
 
                 ## Define function to perform outer-product on specified mvmu
                 # NOTE: outer_product uses signed magnitude representations for positive and negative numbers

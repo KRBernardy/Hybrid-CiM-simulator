@@ -502,9 +502,8 @@ class mux (object):
         return inp_list[sel]
 
     # Note for all practical purpose we will use prop_dummy (mux funtinality is taken care of in code)
-    def propagate_dummy (self, inp):
+    def propagate_dummy (self):
         self.num_access += 1
-        return inp
 
 
 #### Needs some change - add function op (for instance, shift bits for shift)
