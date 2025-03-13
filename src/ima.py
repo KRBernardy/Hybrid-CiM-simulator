@@ -721,8 +721,8 @@ class ima (object):
 
                                 out_adc = '0' * cfg.adc_res
                                 if self.adc_type == 'normal':
-                                    out_adc_pos = self.adc_list[mat_id][key][m][adc_id]['pos'].propagate(out_mux_pos, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc)
-                                    out_adc_neg = self.adc_list[mat_id][key][m][adc_id]['neg'].propagate(out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc)
+                                    out_adc_pos = self.adc_list[mat_id][key][m][adc_id]['pos'].propagate(out_mux_pos, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc, return_type = 'int')
+                                    out_adc_neg = self.adc_list[mat_id][key][m][adc_id]['neg'].propagate(out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc, return_type = 'int')
                                     # NOTE here to deal with overflow, we use propagate_float. this should be fixed later
                                     [out_adc, ovf] = self.alu_list[0].propagate(out_adc_pos, out_adc_neg, 'sub', return_type = 'float')
                                 elif self.adc_type == 'differential':
@@ -738,13 +738,12 @@ class ima (object):
                                     print(("value before sna: %f" % out_sna))
 
                                 # Do the shift and add for mth xbar
-                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc, 'sna', datacfg.stored_bit[m], return_type = 'float')
+                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc, 'sna', datacfg.stored_bit[m] - datacfg.frac_bits, return_type = 'float')
 
                                 if tracking_this and (j == track_addr):
                                     print(("value after sna: %f" % out_sna))
                                     print('')
 
-                            loop2_checkpoint = time.perf_counter()
                             # read from xbar's output register
                             out_xb_outMem = self.xb_outMem_list[mat_id][key].read (j)
                             # shift and add - make a dedicated sna unit -- PENDING

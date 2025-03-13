@@ -304,7 +304,7 @@ class adc (object):
         self.latency = param.adc_lat_dict[str(self.adc_res)]
         return self.latency
 
-    def real2bin (self, inp, num_bits, bits_per_cell = 2, dac_res = cfg.dac_res):
+    def real2bin (self, inp, num_bits, bits_per_cell = 2, dac_res = cfg.dac_res, return_type = 'bin'):
         num_levels = 2**num_bits
         conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
         voltage_step = param.vdd / ((2 ** dac_res) - 1)
@@ -317,12 +317,16 @@ class adc (object):
             print(("int_value: ", int_value))
             print(("num_levels: ", num_levels))
             sys.exit(1)
+        if return_type == 'int':
+            return int_value
         bin_value = bin(int_value)[2:]
         return ('0'*(num_bits - len(bin_value)) + bin_value)
 
     # Here we allow the adc to deal with negative inputs
     # in real circult it should calculate twice, first time for all positive value
-    def propagate (self, inp, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0):
+    def propagate (self, inp, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0, return_type = 'bin'):
+        assert (type(inp) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
+        assert (return_type in ['bin', 'int']), 'return_type should be bin or int'
         if sparsity<50:
             self.num_access['n'] += 1
             self.adc_res = cfg.adc_res
@@ -349,9 +353,9 @@ class adc (object):
             self.adc_res = cfg.adc_res-7
         if(self.adc_res<=0):
             self.adc_res = 1
-        assert (type(inp) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
+        
         num_bits = self.adc_res
-        return self.real2bin (inp, num_bits, bits_per_cell, dac_res)
+        return self.real2bin (inp, num_bits, bits_per_cell, dac_res, return_type)
 
     # HACK - until propagate doesn't have correct analog functionality
     def propagate_dummy (self, inp, sparsity = 0):
@@ -398,7 +402,7 @@ class differential_adc (object):
         self.latency = param.diff_adc_lat_dict[str(self.adc_res)]
         return self.latency
 
-    def real2bin (self, inp_pos, inp_neg, num_bits, bits_per_cell = 2, dac_res = cfg.dac_res):
+    def real2bin (self, inp_pos, inp_neg, num_bits, bits_per_cell = 2, dac_res = cfg.dac_res, return_type = 'bin'):
         num_levels = 2**num_bits
         conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
         voltage_step = param.vdd / ((2 ** dac_res) - 1)
@@ -411,6 +415,8 @@ class differential_adc (object):
             print(("int_value: ", int_value))
             print(("num_levels: ", num_levels))
             sys.exit(1)
+        if return_type == 'int':
+            return int_value
         bin_value = bin(abs(int_value))[2:]
         bin_value = ('0' * (num_bits - len(bin_value)) + bin_value)
         if int_value < 0:
@@ -419,7 +425,9 @@ class differential_adc (object):
 
     # Here we allow the adc to deal with negative inputs
     # in real circult it should calculate twice, first time for all positive value
-    def propagate (self, inp_pos, inp_neg, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0):
+    def propagate (self, inp_pos, inp_neg, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0, return_type = 'bin'):
+        assert (type(inp_pos), type(inp_neg) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
+        assert (return_type in ['bin', 'int']), 'return_type should be bin or int'
         if sparsity<50:
             self.num_access['n'] += 1
             self.adc_res = cfg.adc_res
@@ -446,9 +454,9 @@ class differential_adc (object):
             self.adc_res = cfg.adc_res-7
         if(self.adc_res<=0):
             self.adc_res = 1
-        assert (type(inp_pos), type(inp_neg) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
+        
         num_bits = self.adc_res
-        return self.real2bin (inp_pos, inp_neg, num_bits, bits_per_cell, dac_res)
+        return self.real2bin (inp_pos, inp_neg, num_bits, bits_per_cell, dac_res, return_type)
 
 # Doesn't replicate the exact (sample and hold) functionality (just does hold)
 class sampleNhold (object):
@@ -574,8 +582,12 @@ class alu (object):
                 if (b == ''):
                     b = 0
                 else:
-                    b = b + '0' * c
-                    b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
+                    if c >= 0:
+                        b = b + '0' * c
+                        b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
+                    else:
+                        b = b[:c]
+                        b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
             else:
                 b = b * (2 ** c)
         else:
@@ -586,7 +598,17 @@ class alu (object):
                     b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
         out = self.options[aluop] (a, b)
         # overflow needs to be detected while conversion
-        assert (out <= max_val), 'ALU overflow'
+        try:
+            assert (out <= max_val)
+        except AssertionError:
+            print('ALU overflow')
+            print(('a: ', a))
+            print(('b: ', b))
+            print(('aluop: ', aluop))
+            print(('c: ', c))
+            print(('out: ', out))
+            print(('max_val: ', max_val))
+            sys.exit(1)
         ovf = 0
         if (return_type == 'fixed'):
             out = float2fixed (out, datacfg.int_bits, datacfg.frac_bits)
@@ -854,17 +876,11 @@ class instrn_memory (memory):
     def read (self, addr):
         self.num_access += 1
         assert (type(addr) == int), 'addr type should be int'
-        # assert (-1 < addr < self.size), 'addr exceeds the memory bounds'
-        if (-1 < addr < self.size):
-            if (type(self.memfile[addr]) == dict):
-                return self.memfile[addr].copy()
-            else:
-                return self.memfile[addr]
+        assert (-1 < addr < self.size), 'addr exceeds the memory bounds'
+        if (type(self.memfile[addr]) == dict):
+            return self.memfile[addr].copy()
         else:
-            if (type(self.memfile[len(memfile)]) == dict):
-                return self.memfile[len(memfile)].copy()
-            else:
-                return self.memfile[len(memfile)]
+            return self.memfile[addr]
 
     def write (self, addr, data):
         self.num_access += 1
