@@ -48,12 +48,13 @@ def i_copy (d1, r1, vec = 1, src_type = 0):
     return i_temp
 
 # generate set prototype - set a particular reg value (datamem/xbInmem) to a scalar
-def i_set (d1, imm, vec = 1):
+def i_set (d1, imm, vec = 1, is_address = 0):
     i_temp = param.dummy_instrn.copy ()
     i_temp['opcode'] = 'set'
     i_temp['d1'] = d1
-    i_temp['imm'] = imm if (type(imm) == str) else int2bin(imm, cfg.addr_width)
+    i_temp['imm'] = imm
     i_temp['vec'] = vec
+    i_temp['r1'] = is_address
     return i_temp
 
 # generate alu prototype - arithmrtic, logical, non-linear opearrions

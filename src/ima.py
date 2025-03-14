@@ -336,6 +336,7 @@ class ima (object):
                 self.de_d1 = self.fd_instrn['d1'] # addr for rf
                 self.de_val1 = self.fd_instrn['imm'] #absolute value (shift)
                 self.de_vec = self.fd_instrn['vec']
+                self.de_r1 = self.fd_instrn['r1'] # is address or data? address = 1, data = 0
 
             elif (dec_op == 'alu'):
                 self.de_aluop = self.fd_instrn['aluop']
@@ -534,15 +535,19 @@ class ima (object):
                 return 1
 
             elif (ex_op == 'set'):
+                # Updated for separate data_width and addr_width
+                assert(self.de_d1 >= datamem_off), "set instruction cannot write to MVMU buffer"
+                set_type = 'addr' if self.de_r1 else 'data'
+                value=self.de_val1
+                if set_type == 'data':
+                    value = float2fixed(value, datacfg.int_bits, datacfg.frac_bits)
+                else:
+                    value = int2bin(value, cfg.addr_width)
                 for i in range (self.de_vec):
                     # write to dataMem - check if addr is a valid datamem address
                     dst_addr = self.de_d1 + i
-                    if (dst_addr >= datamem_off):
-                        self.dataMem.write(addr=dst_addr, data=self.de_val1, type_t='addr') #Updated for separate data_width and addr_width
-
-                    else:
-                        assert (1==0) # Set instructions cannot write to MVMU storage
-                        writeToXbarMem (self, dst_addr, self.de_val1)
+                    assert(dst_addr < cfg.dataMem_size + datamem_off), "Exceeded Data Memory Size"
+                    self.dataMem.write(addr=dst_addr, data=value, type_t=set_type)
 
             elif (ex_op == 'cp'):
                 for i in range (self.de_vec):
@@ -620,10 +625,6 @@ class ima (object):
                 # representation for positive and negative numbers
                 @profile
                 def inner_product (mat_id, key):
-                    # check the run time
-                    start_time = time.time()
-                    
-
                     # test if this is the tracking xbar
                     tracking_this = False
                     if tracking and (mat_id == track_mat_id) and (key == track_type):
@@ -671,17 +672,10 @@ class ima (object):
                     result_pos = np.einsum('ij,ijk->ik', input_list, matrix_list_pos)
                     result_neg = np.einsum('ij,ijk->ik', input_list, matrix_list_neg)
                     '''
-                    part1_time_list = []
-                    part2_time_list = []
-                    mux_time_list = []
-                    adc_time_list = []
-                    sna1_time_list = []
-                    sna2_time_list = []
 
                     ## Loop to cover all bits of inputs
                     for k in range (int(math.ceil(cfg.input_prec / cfg.dac_res))): #quantization affects the # of streams
                     #for k in range (1):
-                        loop1_checkpoint = time.perf_counter()
                         # read the values from the xbar's input register
                         out_xb_inMem = self.xb_inMem_list[mat_id][key].read (cfg.dac_res)
                         
@@ -712,37 +706,33 @@ class ima (object):
                             out_snh_pos[m] = self.snh_list_pos[mat_id * datacfg.ReRAM_xbar_num + m].read()
                             out_snh_neg[m] = self.snh_list_neg[mat_id * datacfg.ReRAM_xbar_num + m].read()
 
-                        part1_time = time.perf_counter() - loop1_checkpoint
-                        part1_time_list.append(part1_time)
-                        loop1_checkpoint = time.perf_counter()
-
                         # each of the xbar produce shifted bits of output (weight bits have been distributed)
                         for j in range (cfg.xbar_size): # this 'for' across xbar outs to adc happens via mux
                             out_sna = 0 # a zero for first sna
                             for m in range (datacfg.ReRAM_xbar_num):
-                                loop3_checkpoint = time.perf_counter()
                                 # convert from analog to digital
                                 adc_id = j // cfg.num_column_per_adc
-                                out_mux_pos = self.mux_list[mat_id][key][m][adc_id]['pos'].propagate(out_snh_pos[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
-                                out_mux_neg = self.mux_list[mat_id][key][m][adc_id]['neg'].propagate(out_snh_neg[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
 
-                                mux_time = time.perf_counter() - loop3_checkpoint
-                                mux_time_list.append(mux_time)
-                                loop3_checkpoint = time.perf_counter()
+                                # The commanted code below is the original code, shows how hardwarw should work
+                                # Here to make the code run faster, we directly use the output of SNH.
+                                # This is not the exact hardware behaviour, but it should work exactly the same
+                                # Also use propagate_dummy to count the times mux is called
+                                #out_mux_pos = self.mux_list[mat_id][key][m][adc_id]['pos'].propagate(out_snh_pos[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
+                                #out_mux_neg = self.mux_list[mat_id][key][m][adc_id]['neg'].propagate(out_snh_neg[m][adc_id * cfg.num_column_per_adc: (adc_id + 1) * cfg.num_column_per_adc], j % cfg.num_column_per_adc)
+                                out_mux_pos = out_snh_pos[m][j]
+                                out_mux_neg = out_snh_neg[m][j]
+                                self.mux_list[mat_id][key][m][adc_id]['pos'].propagate_dummy()
+                                self.mux_list[mat_id][key][m][adc_id]['neg'].propagate_dummy()
 
                                 out_adc = '0' * cfg.adc_res
                                 if self.adc_type == 'normal':
-                                    out_adc_pos = self.adc_list[mat_id][key][m][adc_id]['pos'].propagate(out_mux_pos, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc)
-                                    out_adc_neg = self.adc_list[mat_id][key][m][adc_id]['neg'].propagate(out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc)
+                                    out_adc_pos = self.adc_list[mat_id][key][m][adc_id]['pos'].propagate(out_mux_pos, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc, return_type = 'int')
+                                    out_adc_neg = self.adc_list[mat_id][key][m][adc_id]['neg'].propagate(out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc, return_type = 'int')
                                     # NOTE here to deal with overflow, we use propagate_float. this should be fixed later
                                     [out_adc, ovf] = self.alu_list[0].propagate(out_adc_pos, out_adc_neg, 'sub', return_type = 'float')
                                 elif self.adc_type == 'differential':
                                     out_adc = self.adc_list[mat_id][key][m][adc_id].propagate(out_mux_pos, out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc)
                                     out_adc = bin2int(out_adc, cfg.adc_res)
-                                
-                                adc_time = time.perf_counter() - loop3_checkpoint
-                                adc_time_list.append(adc_time)
-                                loop3_checkpoint = time.perf_counter()
 
                                 if tracking_this and (j == track_addr):
                                     print(("xbar ID: %d, digit: %d" % (m, k + 1)))
@@ -753,23 +743,16 @@ class ima (object):
                                     print(("value before sna: %f" % out_sna))
 
                                 # Do the shift and add for mth xbar
-                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc, 'sna', datacfg.stored_bit[m], return_type = 'float')
-
-                                sna1_time = time.perf_counter() - loop3_checkpoint
-                                sna1_time_list.append(sna1_time)
+                                [out_sna, ovf] = self.alu_list[0].propagate(out_sna, out_adc, 'sna', datacfg.stored_bit[m] - datacfg.frac_bits, return_type = 'float')
 
                                 if tracking_this and (j == track_addr):
                                     print(("value after sna: %f" % out_sna))
                                     print('')
 
-                            loop2_checkpoint = time.perf_counter()
                             # read from xbar's output register
                             out_xb_outMem = self.xb_outMem_list[mat_id][key].read (j)
                             # shift and add - make a dedicated sna unit -- PENDING
                             [out_sna, ovf] = self.alu_list[0].propagate(out_xb_outMem, out_sna, 'sna', k * cfg.dac_res - datacfg.frac_bits)
-
-                            sna2_time = time.perf_counter() - loop2_checkpoint
-                            sna2_time_list.append(sna2_time)
 
                             if tracking_this and (j == track_addr):
                                 print(("before this digit: %f" % fixed2float(out_xb_outMem, datacfg.int_bits, datacfg.frac_bits)))
@@ -782,31 +765,10 @@ class ima (object):
                             self.xb_outMem_list[mat_id][key].write (out_sna)
                         self.xb_outMem_list[mat_id][key].restart()
 
-                        part2_time = time.perf_counter() - loop1_checkpoint
-                        part2_time_list.append(part2_time)
-
                     # stride the inputs if applicable
                     self.xb_inMem_list[mat_id][key].stride(self.de_val1, self.de_val2)
 
-                    end_time = time.time()
-                    exec_time = end_time - start_time
-                    sum_part1_time = sum(part1_time_list)
-                    sum_part2_time = sum(part2_time_list)
-                    sum_mux_time = sum(mux_time_list)
-                    sum_adc_time = sum(adc_time_list)
-                    sum_sna1_time = sum(sna1_time_list)
-                    sum_sna2_time = sum(sna2_time_list)
-                    '''
-                    print(f"Execution time: {exec_time * 1000}")
-                    print(f"Part 1 time: {sum_part1_time * 1000}")
-                    print(f"Part 2 time: {sum_part2_time * 1000}")
-                    print(f"Mux time: {sum_mux_time * 1000}")
-                    print(f"ADC time: {sum_adc_time * 1000}")
-                    print(f"SNA1 time: {sum_sna1_time * 1000}")
-                    print(f"SNA2 time: {sum_sna2_time * 1000}")
-                    time.sleep(1)
-                    '''
-                    
+
 
                 ## Define function to perform outer-product on specified mvmu
                 # NOTE: outer_product uses signed magnitude representations for positive and negative numbers
