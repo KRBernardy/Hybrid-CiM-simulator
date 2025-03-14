@@ -541,10 +541,12 @@ class ima (object):
                 value=self.de_val1
                 if set_type == 'data':
                     value = float2fixed(value, datacfg.int_bits, datacfg.frac_bits)
+                else:
+                    value = int2bin(value, cfg.addr_width)
                 for i in range (self.de_vec):
                     # write to dataMem - check if addr is a valid datamem address
                     dst_addr = self.de_d1 + i
-                    assert(dst_addr < cfg.dataMem_size), "Exceeded Data Memory Size"
+                    assert(dst_addr < cfg.dataMem_size + datamem_off), "Exceeded Data Memory Size"
                     self.dataMem.write(addr=dst_addr, data=value, type_t=set_type)
 
             elif (ex_op == 'cp'):

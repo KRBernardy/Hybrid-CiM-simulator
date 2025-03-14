@@ -714,7 +714,7 @@ class memory (object):
         assert (self.addr_start <= addr <= self.addr_end), 'addr exceeds the memory bounds'
         #print 'length of data ' + str(len(data))
         #assert ((type(data) ==  str) and (len(data) == cfg.data_width)), 'data should be a string with mem_width bits'
-        assert ((type(data) == str) and ((type_t == 'data')) or (type_t == 'addr')) # UPDATE - Pointer/address for LD/ST written by previous SET instrn. can be larger than data_width
+        assert ((type(data) == str) and ((type_t == 'data') or (type_t == 'addr'))) # UPDATE - Pointer/address for LD/ST written by previous SET instrn. can be larger than data_width
         if (type_t == 'data'):
             assert (len(data) == cfg.data_width)
         else:
