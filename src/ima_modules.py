@@ -310,13 +310,7 @@ class adc (object):
         voltage_step = param.vdd / ((2 ** dac_res) - 1)
         current_step = voltage_step * conductance_step
         int_value = int(float(inp) / float(current_step))
-        try:
-            assert(int_value < num_levels)
-        except AssertionError:
-            print("ADC overflow")
-            print(("int_value: ", int_value))
-            print(("num_levels: ", num_levels))
-            sys.exit(1)
+        int_value = min(max_val, int_value) # clip to max_val
         if return_type == 'int':
             return int_value
         bin_value = bin(int_value)[2:]
@@ -598,17 +592,7 @@ class alu (object):
                     b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
         out = self.options[aluop] (a, b)
         # overflow needs to be detected while conversion
-        try:
-            assert (out <= max_val)
-        except AssertionError:
-            print('ALU overflow')
-            print(('a: ', a))
-            print(('b: ', b))
-            print(('aluop: ', aluop))
-            print(('c: ', c))
-            print(('out: ', out))
-            print(('max_val: ', max_val))
-            sys.exit(1)
+        out = min(max_val, out) # clip to max_val
         ovf = 0
         if (return_type == 'fixed'):
             out = float2fixed (out, datacfg.int_bits, datacfg.frac_bits)
