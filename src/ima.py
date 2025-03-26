@@ -552,13 +552,24 @@ class ima (object):
             elif (ex_op == 'cp'):
                 for i in range (self.de_vec):
                     src_addr = self.de_r1 + i
-                    # based on address read from dataMem or xb_inMem
+                    # based on address read from dataMem or xb_outMem
                     if (src_addr >= datamem_off):
                         ex_val1 = self.dataMem.read (src_addr)
                     else:
                         ex_val1 = readFromXbarMem (self, src_addr)
 
                     dst_addr = self.de_d1 + i
+                    try:
+                        assert len(ex_val1) == cfg.data_width, "Data width mismatch"
+                    except:
+                        print(ex_val1)
+                        print(len(ex_val1))
+                        print(self.ima_id)
+                        print(self.de_d1)
+                        print(self.de_r1)
+                        print(self.de_r2)
+                        print(self.de_vec)
+                        sys.exit()
                     # based on the address write to dataMem or xb_inMem
                     if (dst_addr >= datamem_off):
                         self.dataMem.write (dst_addr, ex_val1)
@@ -625,6 +636,27 @@ class ima (object):
                 # representation for positive and negative numbers
                 @profile
                 def inner_product (mat_id, key):
+                    
+                    # HACK: This is a quick compute for inner product just to check accuracy
+                    # This is not the actual inner product computation
+                    if cfg.accuracy_only:
+                        input_vector = self.xb_inMem_list[mat_id][key].read_all()
+                        matrix = np.zeros((cfg.xbar_size, cfg.xbar_size))
+                        for i in range (datacfg.ReRAM_xbar_num):
+                            [matrix_pos, matrix_neg] = self.matrix_list[mat_id][key][i].get_value(accurate = True)
+                            conductance_level = param.xbar_conductance_max / (2 ** datacfg.bits_per_cell[i] - 1)
+                            matrix_pos = matrix_pos / conductance_level
+                            matrix = matrix + matrix_pos * (2 ** (datacfg.stored_bit[i] - datacfg.frac_bits))
+                            matrix_neg = matrix_neg / conductance_level
+                            matrix = matrix - matrix_neg * (2 ** (datacfg.stored_bit[i] - datacfg.frac_bits))
+                        output_vector = np.dot(input_vector, matrix)
+                        self.xb_outMem_list[mat_id][key].reset ()
+                        for x in output_vector:
+                            self.xb_outMem_list[mat_id][key].write(float2fixed(x, datacfg.int_bits, datacfg.frac_bits))
+                        self.xb_outMem_list[mat_id][key].restart()
+                        return
+
+
                     # test if this is the tracking xbar
                     tracking_this = False
                     if tracking and (mat_id == track_mat_id) and (key == track_type):

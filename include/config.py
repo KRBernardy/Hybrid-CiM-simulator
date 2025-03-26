@@ -11,6 +11,7 @@ xbar_record = 1
 inference = 1
 training = not(inference)
 sparse_opt = 1 # Flag for Sparsity optimisaton (Make it 0 for only dense computations)
+accuracy_only = 0 # Flag for only accuracy computation. Will not provide any energy numbers
 
 ## Variable to define the type of MVMU
 # One of "Analog", "Digital_V1" or "Digital_V2" 
@@ -118,7 +119,7 @@ packet_width = edram_buswidth/data_width #in multiples of flits (data considered
 # (b bit of address = logN, N is the number of nodes)
 
 # Change here - Specify the Node parameters here
-num_tile_compute = 2
+num_tile_compute = 3
 num_tile_max = 168.0 # maximum number of tiles per node
 num_inj_max = num_tile_max # [conservative] max number of packet injections that can occur in a cycle (each tile injects a packet into NOC each cycle)
 noc_inj_rate = 0.005

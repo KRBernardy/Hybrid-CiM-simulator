@@ -12,6 +12,7 @@ from include.data_config import datacfg, max_val, min_val
 import math
 from data_convert import *
 
+from line_profiler import profile
 
 class xbar (object):
     def __init__ (self, xbar_size, bits_per_cell = 2, xbar_value= 'nil' ):
@@ -55,8 +56,10 @@ class xbar (object):
     def bitsPerCell(self):
         return str(self.bits_per_cell)
 
-    def get_value(self):
+    def get_value(self, accurate = False):
         # This function is used to get the xbar value for quick calculation
+        if accurate:
+            return [self.xbar_value_pos, self.xbar_value_neg]
         noise_pos = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
         value_with_noise_pos = self.xbar_value_pos + noise_pos
         value_with_noise_pos[value_with_noise_pos < 0] = 0 # conductance should not be negative, set all negataive values 0
@@ -124,6 +127,7 @@ class xbar (object):
         return self.latency_wr
 
     #input here should be float list, we use float to represent analog values
+    @profile
     def propagate (self, inp = 'nil', sparsity = 0, accurate = False):
         if cfg.MVMU_ver == "Analog":
             self.num_access['0'] += 1
@@ -304,6 +308,7 @@ class adc (object):
         self.latency = param.adc_lat_dict[str(self.adc_res)]
         return self.latency
 
+    @profile
     def real2bin (self, inp, num_bits, bits_per_cell = 2, dac_res = cfg.dac_res, return_type = 'bin'):
         num_levels = 2**num_bits
         conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
@@ -318,6 +323,7 @@ class adc (object):
 
     # Here we allow the adc to deal with negative inputs
     # in real circult it should calculate twice, first time for all positive value
+    @profile
     def propagate (self, inp, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0, return_type = 'bin'):
         assert (type(inp) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
         assert (return_type in ['bin', 'int']), 'return_type should be bin or int'
@@ -748,7 +754,9 @@ class xb_inMem (object):
         out_list = []
         for i in range(self.xbar_size):
             value = self.memfile[i]
-            out_list.append(value)
+            if value == '':
+                value = '0' * cfg.data_width
+            out_list.append(fixed2float(value, datacfg.int_bits, datacfg.frac_bits))
         return out_list
 
     def write (self, addr, data):
