@@ -634,7 +634,6 @@ class ima (object):
                 ## Define function to perform inner-product on specified mvmu
                 # Note: Inner product with shift and add (shift-sub with last bit), works for 2s complement
                 # representation for positive and negative numbers
-                @profile
                 def inner_product (mat_id, key):
                     
                     # HACK: This is a quick compute for inner product just to check accuracy
