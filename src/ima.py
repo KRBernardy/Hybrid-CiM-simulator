@@ -649,7 +649,7 @@ class ima (object):
                             matrix = matrix + matrix_pos * (2 ** (datacfg.stored_bit[i] - datacfg.frac_bits))
                             matrix_neg = matrix_neg / conductance_level
                             matrix = matrix - matrix_neg * (2 ** (datacfg.stored_bit[i] - datacfg.frac_bits))
-                        output_vector = np.dot(input_vector, matrix)
+                        output_vector = np.dot(input_vector, matrix.transpose())
                         self.xb_outMem_list[mat_id][key].reset ()
                         for x in output_vector:
                             self.xb_outMem_list[mat_id][key].write(float2fixed(x, datacfg.int_bits, datacfg.frac_bits))
@@ -850,7 +850,7 @@ class ima (object):
 
                 if (cfg.inference):
                    for i in range(cfg.num_matrix):
-                       if self.de_xb_nma[i]:
+                       if self.de_xb_nma[i] != '000':
                            #print ("ima_id: " +str(self.ima_id) + " mat_id: "  +str(i) + " MVM")
                            inner_product(i,'f')
 

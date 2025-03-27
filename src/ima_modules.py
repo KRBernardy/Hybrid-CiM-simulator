@@ -127,7 +127,6 @@ class xbar (object):
         return self.latency_wr
 
     #input here should be float list, we use float to represent analog values
-    @profile
     def propagate (self, inp = 'nil', sparsity = 0, accurate = False):
         if cfg.MVMU_ver == "Analog":
             self.num_access['0'] += 1
@@ -144,12 +143,12 @@ class xbar (object):
             noise_pos = rng.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
             value_with_noise_pos = self.xbar_value_pos + noise_pos
             value_with_noise_pos[value_with_noise_pos < 0] = 0 # conductance should not be negative, set all negataive values 0
-            out_pos = np.dot(inp, value_with_noise_pos)
+            out_pos = np.dot(inp, value_with_noise_pos.transpose())
 
             noise_neg = rng.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
             value_with_noise_neg = self.xbar_value_neg + noise_neg
             value_with_noise_neg[value_with_noise_neg < 0] = 0 # conductance should not be negative, set all negataive values 0
-            out_neg = np.dot(inp, value_with_noise_neg)
+            out_neg = np.dot(inp, value_with_noise_neg.transpose())
         self.record([out_pos, out_neg])
         return [out_pos, out_neg]
 
@@ -308,7 +307,6 @@ class adc (object):
         self.latency = param.adc_lat_dict[str(self.adc_res)]
         return self.latency
 
-    @profile
     def real2bin (self, inp, num_bits, bits_per_cell = 2, dac_res = cfg.dac_res, return_type = 'bin'):
         num_levels = 2**num_bits
         conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
@@ -323,7 +321,6 @@ class adc (object):
 
     # Here we allow the adc to deal with negative inputs
     # in real circult it should calculate twice, first time for all positive value
-    @profile
     def propagate (self, inp, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0, return_type = 'bin'):
         assert (type(inp) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
         assert (return_type in ['bin', 'int']), 'return_type should be bin or int'
