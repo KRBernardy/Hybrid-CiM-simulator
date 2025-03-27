@@ -12,7 +12,7 @@ from include.data_config import datacfg, max_val, min_val
 import math
 from data_convert import *
 
-from line_profiler import profile
+import line_profiler
 
 class xbar (object):
     def __init__ (self, xbar_size, bits_per_cell = 2, xbar_value= 'nil' ):
@@ -294,7 +294,7 @@ class dac_array (object):
 
 # Probably - also doing the sampling part of (sample and hold) inside
 class adc (object):
-    def __init__ (self, adc_res):
+    def __init__ (self, adc_res, bits_per_cell = 2):
         # define num_access
         self.num_access = { 'n':0, 'n/2': 0,'n/4': 0,'n/8': 0,'n/16': 0,'n/32': 0,'n/64': 0,'n/128': 0}
         
@@ -303,17 +303,20 @@ class adc (object):
 
         self.adc_res = adc_res
 
+        self.bits_per_cell = bits_per_cell
+        self.max_val = 2 ** adc_res - 1
+
+        num_levels = 2**adc_res
+        conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
+        voltage_step = param.vdd / ((2 ** cfg.dac_res) - 1)
+        self.current_step = voltage_step * conductance_step
+
     def getLatency (self):
         self.latency = param.adc_lat_dict[str(self.adc_res)]
         return self.latency
 
     def real2bin (self, inp, num_bits, bits_per_cell = 2, dac_res = cfg.dac_res, return_type = 'bin'):
-        num_levels = 2**num_bits
-        conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
-        voltage_step = param.vdd / ((2 ** dac_res) - 1)
-        current_step = voltage_step * conductance_step
-        int_value = int(float(inp) / float(current_step))
-        int_value = min(max_val, int_value) # clip to max_val
+        int_value = min(int(inp / self.current_step), max_val) # clip to max_val
         if return_type == 'int':
             return int_value
         bin_value = bin(int_value)[2:]
@@ -321,38 +324,22 @@ class adc (object):
 
     # Here we allow the adc to deal with negative inputs
     # in real circult it should calculate twice, first time for all positive value
-    def propagate (self, inp, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0, return_type = 'bin'):
+    def propagate (self, inp, sparsity = 0, return_type = 'bin'):
         assert (type(inp) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
         assert (return_type in ['bin', 'int']), 'return_type should be bin or int'
-        if sparsity<50:
-            self.num_access['n'] += 1
-            self.adc_res = cfg.adc_res
-        elif sparsity<75:
-            self.num_access['n/2'] += 1
-            self.adc_res = cfg.adc_res-1
-        elif sparsity<87.5:
-            self.num_access['n/4'] += 1
-            self.adc_res = cfg.adc_res-2
-        elif sparsity<93.75:
-            self.num_access['n/8'] += 1
-            self.adc_res = cfg.adc_res-3
-        elif sparsity<96.875:
-            self.num_access['n/16'] += 1
-            self.adc_res = cfg.adc_res-4
-        elif sparsity<98.4375:
-            self.num_access['n/32'] += 1
-            self.adc_res = cfg.adc_res-5
-        elif sparsity<99.21875:
-            self.num_access['n/64'] += 1
-            self.adc_res = cfg.adc_res-6
+        if sparsity > 0:
+            reduction_level = min(7, int(np.log2(100/(100-sparsity))))
+            self.adc_res = max(1, cfg.adc_res - reduction_level)
+            self.num_access[f'n/{2**reduction_level}'] += 1
         else:
-            self.num_access['n/128'] += 1
-            self.adc_res = cfg.adc_res-7
-        if(self.adc_res<=0):
-            self.adc_res = 1
+            self.adc_res = cfg.adc_res
+            self.num_access['n'] += 1
         
-        num_bits = self.adc_res
-        return self.real2bin (inp, num_bits, bits_per_cell, dac_res, return_type)
+        int_value = min(int(inp / self.current_step), self.max_val) # clip to max_val
+
+        if return_type == 'int':
+            return int_value
+        return int2bin(int_value, self.adc_res)
 
     # HACK - until propagate doesn't have correct analog functionality
     def propagate_dummy (self, inp, sparsity = 0):
@@ -386,7 +373,7 @@ class adc (object):
         return inp
     
 class differential_adc (object):
-    def __init__ (self, adc_res):
+    def __init__ (self, adc_res, bits_per_cell = 2):
         # define num_access
         self.num_access = { 'n':0, 'n/2': 0,'n/4': 0,'n/8': 0,'n/16': 0,'n/32': 0,'n/64': 0,'n/128': 0}
         
@@ -394,6 +381,15 @@ class differential_adc (object):
         self.latency = param.diff_adc_lat_dict[str(adc_res)]
 
         self.adc_res = adc_res
+
+        self.bits_per_cell = bits_per_cell
+        self.max_val = 2 ** adc_res - 1
+        self.min_val = -1 * 2 ** adc_res
+
+        num_levels = 2**adc_res
+        conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
+        voltage_step = param.vdd / ((2 ** cfg.dac_res) - 1)
+        self.current_step = voltage_step * conductance_step
 
     def getLatency (self):
         self.latency = param.diff_adc_lat_dict[str(self.adc_res)]
@@ -414,46 +410,28 @@ class differential_adc (object):
             sys.exit(1)
         if return_type == 'int':
             return int_value
-        bin_value = bin(abs(int_value))[2:]
-        bin_value = ('0' * (num_bits - len(bin_value)) + bin_value)
-        if int_value < 0:
-            bin_value = twos_complement(bin_value)
-        return bin_value
+        return int2bin(int_value, num_bits)
 
     # Here we allow the adc to deal with negative inputs
     # in real circult it should calculate twice, first time for all positive value
-    def propagate (self, inp_pos, inp_neg, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0, return_type = 'bin'):
+    def propagate (self, inp_pos, inp_neg, sparsity = 0, return_type = 'bin'):
         assert (type(inp_pos), type(inp_neg) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
         assert (return_type in ['bin', 'int']), 'return_type should be bin or int'
-        if sparsity<50:
-            self.num_access['n'] += 1
-            self.adc_res = cfg.adc_res
-        elif sparsity<75:
-            self.num_access['n/2'] += 1
-            self.adc_res = cfg.adc_res-1
-        elif sparsity<87.5:
-            self.num_access['n/4'] += 1
-            self.adc_res = cfg.adc_res-2
-        elif sparsity<93.75:
-            self.num_access['n/8'] += 1
-            self.adc_res = cfg.adc_res-3
-        elif sparsity<96.875:
-            self.num_access['n/16'] += 1
-            self.adc_res = cfg.adc_res-4
-        elif sparsity<98.4375:
-            self.num_access['n/32'] += 1
-            self.adc_res = cfg.adc_res-5
-        elif sparsity<99.21875:
-            self.num_access['n/64'] += 1
-            self.adc_res = cfg.adc_res-6
+        if sparsity > 0:
+            reduction_level = min(7, int(np.log2(100/(100-sparsity))))
+            self.adc_res = max(1, cfg.adc_res - reduction_level)
+            self.num_access[f'n/{2**reduction_level}'] += 1
         else:
-            self.num_access['n/128'] += 1
-            self.adc_res = cfg.adc_res-7
-        if(self.adc_res<=0):
-            self.adc_res = 1
+            self.adc_res = cfg.adc_res
+            self.num_access['n'] += 1
         
-        num_bits = self.adc_res
-        return self.real2bin (inp_pos, inp_neg, num_bits, bits_per_cell, dac_res, return_type)
+        int_value = int((inp_pos - inp_neg) / self.current_step)
+        int_value = min(int_value, max_val) # clip to max_val
+        int_value = max(int_value, min_val) # clip to min_val
+
+        if return_type == 'int':
+            return int_value
+        return int2bin(int_value, self.adc_res)
 
 # Doesn't replicate the exact (sample and hold) functionality (just does hold)
 class sampleNhold (object):
