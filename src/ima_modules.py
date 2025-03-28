@@ -544,40 +544,55 @@ class alu (object):
     def getLatency (self):
         return self.latency
 
-    def propagate (self, a, b, aluop, c = 0, return_type = 'fixed'): # c can be shift operand for sna operation (add others later)
-        assert ((type(aluop) == str) and (aluop in list(self.options.keys()))), 'Invalid alu_op'
-        assert (type(c) == int or (type(c) == str and len(c) == datacfg.num_bits)), 'ALU sna: shift = int/ num_bit str'
+    def propagate (self, a, b, aluop, c = 0, return_type = 'fixed'): # c can be shift operand for sna/sns operation
         assert (return_type == 'fixed' or return_type == 'float'), "return_type can only be 'fixed' or 'float'"
-        if (type(c) == str):
-            c = bin2int (c, datacfg.num_bits)
-        if type(a) == str:
-            a = fixed2float (a, datacfg.int_bits, datacfg.frac_bits)
-        if (aluop == 'sna' or aluop == 'sns'): # shift left in fixed point binary
-            if type(b) == str:
-                if (b == ''):
-                    b = 0
-                else:
-                    if c >= 0:
-                        b = b + '0' * c
-                        b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
-                    else:
-                        b = b[:c]
-                        b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
+        assert (type(c) == int), 'For sna, needs a int to represent shift bits'
+        if (type(a) == str):
+            if (a == ''):
+                a = 0
             else:
-                b = b * (2 ** c)
+                assert (len(a) == datacfg.num_bits), 'string input should be of cfg.num_bits length'
+                a = fixed2float (a, datacfg.int_bits, datacfg.frac_bits)
+        if (type(b) == str):
+            if (b == ''):
+                b = 0
+            else:
+                assert (len(b) == datacfg.num_bits), 'string input should be of cfg.num_bits length'
+                b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
+        if (aluop == 'add'):
+            out = a + b
+        elif (aluop == 'sub'):
+            out = a - b
+        elif (aluop == 'mul'):
+            out = a * b
+        elif (aluop == 'div'):
+            out = a / b
+        elif (aluop == 'sna'):
+            out = a + (b * (2 ** c))
+        elif (aluop == 'sns'):
+            out = a - (b * (2 ** c))
+        elif (aluop == 'sig'):
+            out = 1 / (1 + math.exp(-a))
+        elif (aluop == 'tanh'):
+            out = np.tanh(a)
+        elif (aluop == 'relu'):
+            out = a if (a > 0) else 0
+        elif (aluop == 'max'):
+            out = max(a,b)
         else:
-            if type(b) == str: # shift left in fixed point binary
-                if b == '':
-                    b = 0
-                else:
-                    b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
-        out = self.options[aluop] (a, b)
-        # overflow needs to be detected while conversion
-        out = min(max_val, out) # clip to max_val
+            assert (False), 'Invalid alu_op'
         ovf = 0
+        if out > max_val:
+            out = max_val
+            ovf = 1
+        if out < min_val:
+            out = min_val
+            ovf = 1
         if (return_type == 'fixed'):
             out = float2fixed (out, datacfg.int_bits, datacfg.frac_bits)
         return [out, ovf]
+
+
 
     # for functionality define a propagate float for use in inter-xbar shift-and-adds
     # Note: xbar_propagate uses np.dot to compute dot product in float
