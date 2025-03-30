@@ -122,10 +122,10 @@ class ima (object):
                         if cfg.adc_type == 'normal': # two normal ADCs will be needed here, one for positive and one for negative
                             self.adc_list[mat_id][key][xbar_id].append({})
                             for pos_neg in ['pos', 'neg']:
-                                temp_adc = imod.adc (cfg.adc_res)
+                                temp_adc = imod.adc (cfg.adc_res, datacfg.bits_per_cell[xbar_id])
                                 self.adc_list[mat_id][key][xbar_id][adc_id][pos_neg] = temp_adc
                         elif cfg.adc_type == 'differential':
-                            temp_adc = imod.differential_adc (cfg.adc_res)
+                            temp_adc = imod.differential_adc (cfg.adc_res, datacfg.bits_per_cell[xbar_id])
                             self.adc_list[mat_id][key][xbar_id].append(temp_adc)
 
         # Instantiate sample and hold
@@ -552,13 +552,24 @@ class ima (object):
             elif (ex_op == 'cp'):
                 for i in range (self.de_vec):
                     src_addr = self.de_r1 + i
-                    # based on address read from dataMem or xb_inMem
+                    # based on address read from dataMem or xb_outMem
                     if (src_addr >= datamem_off):
                         ex_val1 = self.dataMem.read (src_addr)
                     else:
                         ex_val1 = readFromXbarMem (self, src_addr)
 
                     dst_addr = self.de_d1 + i
+                    try:
+                        assert len(ex_val1) == cfg.data_width, "Data width mismatch"
+                    except:
+                        print(ex_val1)
+                        print(len(ex_val1))
+                        print(self.ima_id)
+                        print(self.de_d1)
+                        print(self.de_r1)
+                        print(self.de_r2)
+                        print(self.de_vec)
+                        sys.exit()
                     # based on the address write to dataMem or xb_inMem
                     if (dst_addr >= datamem_off):
                         self.dataMem.write (dst_addr, ex_val1)
@@ -623,8 +634,28 @@ class ima (object):
                 ## Define function to perform inner-product on specified mvmu
                 # Note: Inner product with shift and add (shift-sub with last bit), works for 2s complement
                 # representation for positive and negative numbers
-                @profile
                 def inner_product (mat_id, key):
+                    
+                    # HACK: This is a quick compute for inner product just to check accuracy
+                    # This is not the actual inner product computation
+                    if cfg.accuracy_only:
+                        input_vector = self.xb_inMem_list[mat_id][key].read_all()
+                        matrix = np.zeros((cfg.xbar_size, cfg.xbar_size))
+                        for i in range (datacfg.ReRAM_xbar_num):
+                            [matrix_pos, matrix_neg] = self.matrix_list[mat_id][key][i].get_value(accurate = True)
+                            conductance_level = param.xbar_conductance_max / (2 ** datacfg.bits_per_cell[i] - 1)
+                            matrix_pos = matrix_pos / conductance_level
+                            matrix = matrix + matrix_pos * (2 ** (datacfg.stored_bit[i] - datacfg.frac_bits))
+                            matrix_neg = matrix_neg / conductance_level
+                            matrix = matrix - matrix_neg * (2 ** (datacfg.stored_bit[i] - datacfg.frac_bits))
+                        output_vector = np.dot(input_vector, matrix.transpose())
+                        self.xb_outMem_list[mat_id][key].reset ()
+                        for x in output_vector:
+                            self.xb_outMem_list[mat_id][key].write(float2fixed(x, datacfg.int_bits, datacfg.frac_bits))
+                        self.xb_outMem_list[mat_id][key].restart()
+                        return
+
+
                     # test if this is the tracking xbar
                     tracking_this = False
                     if tracking and (mat_id == track_mat_id) and (key == track_type):
@@ -726,12 +757,12 @@ class ima (object):
 
                                 out_adc = '0' * cfg.adc_res
                                 if self.adc_type == 'normal':
-                                    out_adc_pos = self.adc_list[mat_id][key][m][adc_id]['pos'].propagate(out_mux_pos, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc, return_type = 'int')
-                                    out_adc_neg = self.adc_list[mat_id][key][m][adc_id]['neg'].propagate(out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc, return_type = 'int')
+                                    out_adc_pos = self.adc_list[mat_id][key][m][adc_id]['pos'].propagate(out_mux_pos, sparsity_adc, return_type = 'int')
+                                    out_adc_neg = self.adc_list[mat_id][key][m][adc_id]['neg'].propagate(out_mux_neg, sparsity_adc, return_type = 'int')
                                     # NOTE here to deal with overflow, we use propagate_float. this should be fixed later
                                     [out_adc, ovf] = self.alu_list[0].propagate(out_adc_pos, out_adc_neg, 'sub', return_type = 'float')
                                 elif self.adc_type == 'differential':
-                                    out_adc = self.adc_list[mat_id][key][m][adc_id].propagate(out_mux_pos, out_mux_neg, datacfg.bits_per_cell[m], cfg.dac_res, sparsity_adc)
+                                    out_adc = self.adc_list[mat_id][key][m][adc_id].propagate(out_mux_pos, out_mux_neg, sparsity_adc, return_type = 'int')
                                     out_adc = bin2int(out_adc, cfg.adc_res)
 
                                 if tracking_this and (j == track_addr):
@@ -818,7 +849,7 @@ class ima (object):
 
                 if (cfg.inference):
                    for i in range(cfg.num_matrix):
-                       if self.de_xb_nma[i]:
+                       if self.de_xb_nma[i] != '000':
                            #print ("ima_id: " +str(self.ima_id) + " mat_id: "  +str(i) + " MVM")
                            inner_product(i,'f')
 

@@ -12,6 +12,7 @@ from include.data_config import datacfg, max_val, min_val
 import math
 from data_convert import *
 
+import line_profiler
 
 class xbar (object):
     def __init__ (self, xbar_size, bits_per_cell = 2, xbar_value= 'nil' ):
@@ -55,8 +56,10 @@ class xbar (object):
     def bitsPerCell(self):
         return str(self.bits_per_cell)
 
-    def get_value(self):
+    def get_value(self, accurate = False):
         # This function is used to get the xbar value for quick calculation
+        if accurate:
+            return [self.xbar_value_pos, self.xbar_value_neg]
         noise_pos = np.random.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
         value_with_noise_pos = self.xbar_value_pos + noise_pos
         value_with_noise_pos[value_with_noise_pos < 0] = 0 # conductance should not be negative, set all negataive values 0
@@ -140,12 +143,12 @@ class xbar (object):
             noise_pos = rng.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
             value_with_noise_pos = self.xbar_value_pos + noise_pos
             value_with_noise_pos[value_with_noise_pos < 0] = 0 # conductance should not be negative, set all negataive values 0
-            out_pos = np.dot(inp, value_with_noise_pos)
+            out_pos = np.dot(inp, value_with_noise_pos.transpose())
 
             noise_neg = rng.normal(0, param.ReRAM_read_sigma, (self.xbar_size, self.xbar_size))
             value_with_noise_neg = self.xbar_value_neg + noise_neg
             value_with_noise_neg[value_with_noise_neg < 0] = 0 # conductance should not be negative, set all negataive values 0
-            out_neg = np.dot(inp, value_with_noise_neg)
+            out_neg = np.dot(inp, value_with_noise_neg.transpose())
         self.record([out_pos, out_neg])
         return [out_pos, out_neg]
 
@@ -291,7 +294,7 @@ class dac_array (object):
 
 # Probably - also doing the sampling part of (sample and hold) inside
 class adc (object):
-    def __init__ (self, adc_res):
+    def __init__ (self, adc_res, bits_per_cell = 2):
         # define num_access
         self.num_access = { 'n':0, 'n/2': 0,'n/4': 0,'n/8': 0,'n/16': 0,'n/32': 0,'n/64': 0,'n/128': 0}
         
@@ -300,17 +303,20 @@ class adc (object):
 
         self.adc_res = adc_res
 
+        self.bits_per_cell = bits_per_cell
+        self.max_val = 2 ** adc_res - 1
+
+        num_levels = 2**adc_res
+        conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
+        voltage_step = param.vdd / ((2 ** cfg.dac_res) - 1)
+        self.current_step = voltage_step * conductance_step
+
     def getLatency (self):
         self.latency = param.adc_lat_dict[str(self.adc_res)]
         return self.latency
 
     def real2bin (self, inp, num_bits, bits_per_cell = 2, dac_res = cfg.dac_res, return_type = 'bin'):
-        num_levels = 2**num_bits
-        conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
-        voltage_step = param.vdd / ((2 ** dac_res) - 1)
-        current_step = voltage_step * conductance_step
-        int_value = int(float(inp) / float(current_step))
-        int_value = min(max_val, int_value) # clip to max_val
+        int_value = min(int(inp / self.current_step), max_val) # clip to max_val
         if return_type == 'int':
             return int_value
         bin_value = bin(int_value)[2:]
@@ -318,38 +324,22 @@ class adc (object):
 
     # Here we allow the adc to deal with negative inputs
     # in real circult it should calculate twice, first time for all positive value
-    def propagate (self, inp, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0, return_type = 'bin'):
+    def propagate (self, inp, sparsity = 0, return_type = 'bin'):
         assert (type(inp) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
         assert (return_type in ['bin', 'int']), 'return_type should be bin or int'
-        if sparsity<50:
-            self.num_access['n'] += 1
-            self.adc_res = cfg.adc_res
-        elif sparsity<75:
-            self.num_access['n/2'] += 1
-            self.adc_res = cfg.adc_res-1
-        elif sparsity<87.5:
-            self.num_access['n/4'] += 1
-            self.adc_res = cfg.adc_res-2
-        elif sparsity<93.75:
-            self.num_access['n/8'] += 1
-            self.adc_res = cfg.adc_res-3
-        elif sparsity<96.875:
-            self.num_access['n/16'] += 1
-            self.adc_res = cfg.adc_res-4
-        elif sparsity<98.4375:
-            self.num_access['n/32'] += 1
-            self.adc_res = cfg.adc_res-5
-        elif sparsity<99.21875:
-            self.num_access['n/64'] += 1
-            self.adc_res = cfg.adc_res-6
+        if sparsity > 0:
+            reduction_level = min(7, int(np.log2(100/(100-sparsity))))
+            self.adc_res = max(1, cfg.adc_res - reduction_level)
+            self.num_access[f'n/{2**reduction_level}'] += 1
         else:
-            self.num_access['n/128'] += 1
-            self.adc_res = cfg.adc_res-7
-        if(self.adc_res<=0):
-            self.adc_res = 1
+            self.adc_res = cfg.adc_res
+            self.num_access['n'] += 1
         
-        num_bits = self.adc_res
-        return self.real2bin (inp, num_bits, bits_per_cell, dac_res, return_type)
+        int_value = min(int(inp / self.current_step), self.max_val) # clip to max_val
+
+        if return_type == 'int':
+            return int_value
+        return int2bin(int_value, self.adc_res)
 
     # HACK - until propagate doesn't have correct analog functionality
     def propagate_dummy (self, inp, sparsity = 0):
@@ -383,7 +373,7 @@ class adc (object):
         return inp
     
 class differential_adc (object):
-    def __init__ (self, adc_res):
+    def __init__ (self, adc_res, bits_per_cell = 2):
         # define num_access
         self.num_access = { 'n':0, 'n/2': 0,'n/4': 0,'n/8': 0,'n/16': 0,'n/32': 0,'n/64': 0,'n/128': 0}
         
@@ -391,6 +381,15 @@ class differential_adc (object):
         self.latency = param.diff_adc_lat_dict[str(adc_res)]
 
         self.adc_res = adc_res
+
+        self.bits_per_cell = bits_per_cell
+        self.max_val = 2 ** adc_res - 1
+        self.min_val = -1 * 2 ** adc_res
+
+        num_levels = 2**adc_res
+        conductance_step = (param.xbar_conductance_max - param.xbar_conductance_min) / ((2 ** bits_per_cell) - 1)
+        voltage_step = param.vdd / ((2 ** cfg.dac_res) - 1)
+        self.current_step = voltage_step * conductance_step
 
     def getLatency (self):
         self.latency = param.diff_adc_lat_dict[str(self.adc_res)]
@@ -411,46 +410,28 @@ class differential_adc (object):
             sys.exit(1)
         if return_type == 'int':
             return int_value
-        bin_value = bin(abs(int_value))[2:]
-        bin_value = ('0' * (num_bits - len(bin_value)) + bin_value)
-        if int_value < 0:
-            bin_value = twos_complement(bin_value)
-        return bin_value
+        return int2bin(int_value, num_bits)
 
     # Here we allow the adc to deal with negative inputs
     # in real circult it should calculate twice, first time for all positive value
-    def propagate (self, inp_pos, inp_neg, bits_per_cell = 2, dac_res = cfg.dac_res, sparsity = 0, return_type = 'bin'):
+    def propagate (self, inp_pos, inp_neg, sparsity = 0, return_type = 'bin'):
         assert (type(inp_pos), type(inp_neg) in [float, np.float32, np.float64]), 'adc input type mismatch (float, np.float32, np.float64 expected)'
         assert (return_type in ['bin', 'int']), 'return_type should be bin or int'
-        if sparsity<50:
-            self.num_access['n'] += 1
-            self.adc_res = cfg.adc_res
-        elif sparsity<75:
-            self.num_access['n/2'] += 1
-            self.adc_res = cfg.adc_res-1
-        elif sparsity<87.5:
-            self.num_access['n/4'] += 1
-            self.adc_res = cfg.adc_res-2
-        elif sparsity<93.75:
-            self.num_access['n/8'] += 1
-            self.adc_res = cfg.adc_res-3
-        elif sparsity<96.875:
-            self.num_access['n/16'] += 1
-            self.adc_res = cfg.adc_res-4
-        elif sparsity<98.4375:
-            self.num_access['n/32'] += 1
-            self.adc_res = cfg.adc_res-5
-        elif sparsity<99.21875:
-            self.num_access['n/64'] += 1
-            self.adc_res = cfg.adc_res-6
+        if sparsity > 0:
+            reduction_level = min(7, int(np.log2(100/(100-sparsity))))
+            self.adc_res = max(1, cfg.adc_res - reduction_level)
+            self.num_access[f'n/{2**reduction_level}'] += 1
         else:
-            self.num_access['n/128'] += 1
-            self.adc_res = cfg.adc_res-7
-        if(self.adc_res<=0):
-            self.adc_res = 1
+            self.adc_res = cfg.adc_res
+            self.num_access['n'] += 1
         
-        num_bits = self.adc_res
-        return self.real2bin (inp_pos, inp_neg, num_bits, bits_per_cell, dac_res, return_type)
+        int_value = int((inp_pos - inp_neg) / self.current_step)
+        int_value = min(int_value, max_val) # clip to max_val
+        int_value = max(int_value, min_val) # clip to min_val
+
+        if return_type == 'int':
+            return int_value
+        return int2bin(int_value, self.adc_res)
 
 # Doesn't replicate the exact (sample and hold) functionality (just does hold)
 class sampleNhold (object):
@@ -563,40 +544,55 @@ class alu (object):
     def getLatency (self):
         return self.latency
 
-    def propagate (self, a, b, aluop, c = 0, return_type = 'fixed'): # c can be shift operand for sna operation (add others later)
-        assert ((type(aluop) == str) and (aluop in list(self.options.keys()))), 'Invalid alu_op'
-        assert (type(c) == int or (type(c) == str and len(c) == datacfg.num_bits)), 'ALU sna: shift = int/ num_bit str'
+    def propagate (self, a, b, aluop, c = 0, return_type = 'fixed'): # c can be shift operand for sna/sns operation
         assert (return_type == 'fixed' or return_type == 'float'), "return_type can only be 'fixed' or 'float'"
-        if (type(c) == str):
-            c = bin2int (c, datacfg.num_bits)
-        if type(a) == str:
-            a = fixed2float (a, datacfg.int_bits, datacfg.frac_bits)
-        if (aluop == 'sna' or aluop == 'sns'): # shift left in fixed point binary
-            if type(b) == str:
-                if (b == ''):
-                    b = 0
-                else:
-                    if c >= 0:
-                        b = b + '0' * c
-                        b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
-                    else:
-                        b = b[:c]
-                        b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
+        assert (type(c) == int), 'For sna, needs a int to represent shift bits'
+        if (type(a) == str):
+            if (a == ''):
+                a = 0
             else:
-                b = b * (2 ** c)
+                assert (len(a) == datacfg.num_bits), 'string input should be of cfg.num_bits length'
+                a = fixed2float (a, datacfg.int_bits, datacfg.frac_bits)
+        if (type(b) == str):
+            if (b == ''):
+                b = 0
+            else:
+                assert (len(b) == datacfg.num_bits), 'string input should be of cfg.num_bits length'
+                b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
+        if (aluop == 'add'):
+            out = a + b
+        elif (aluop == 'sub'):
+            out = a - b
+        elif (aluop == 'mul'):
+            out = a * b
+        elif (aluop == 'div'):
+            out = a / b
+        elif (aluop == 'sna'):
+            out = a + (b * (2 ** c))
+        elif (aluop == 'sns'):
+            out = a - (b * (2 ** c))
+        elif (aluop == 'sig'):
+            out = 1 / (1 + math.exp(-a))
+        elif (aluop == 'tanh'):
+            out = np.tanh(a)
+        elif (aluop == 'relu'):
+            out = a if (a > 0) else 0
+        elif (aluop == 'max'):
+            out = max(a,b)
         else:
-            if type(b) == str: # shift left in fixed point binary
-                if b == '':
-                    b = 0
-                else:
-                    b = fixed2float (b, datacfg.int_bits, datacfg.frac_bits)
-        out = self.options[aluop] (a, b)
-        # overflow needs to be detected while conversion
-        out = min(max_val, out) # clip to max_val
+            assert (False), 'Invalid alu_op'
         ovf = 0
+        if out > max_val:
+            out = max_val
+            ovf = 1
+        if out < min_val:
+            out = min_val
+            ovf = 1
         if (return_type == 'fixed'):
             out = float2fixed (out, datacfg.int_bits, datacfg.frac_bits)
         return [out, ovf]
+
+
 
     # for functionality define a propagate float for use in inter-xbar shift-and-adds
     # Note: xbar_propagate uses np.dot to compute dot product in float
@@ -748,7 +744,9 @@ class xb_inMem (object):
         out_list = []
         for i in range(self.xbar_size):
             value = self.memfile[i]
-            out_list.append(value)
+            if value == '':
+                value = '0' * cfg.data_width
+            out_list.append(fixed2float(value, datacfg.int_bits, datacfg.frac_bits))
         return out_list
 
     def write (self, addr, data):

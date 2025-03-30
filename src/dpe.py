@@ -127,12 +127,6 @@ class DPE:
 
 
         inp_tileId = 0
-        assert (os.path.exists(inp_path)
-                ), 'Input Error: Provide input before running the DPE'
-
-        assert (os.path.exists(instrndir+'/'+'tile0')
-                ), 'Input Error: Provide input before running the DPE'
-  
         print(('length of input data:', len(inp['data'])))
         for i in range(len(inp['data'])):
             data = float2fixed(inp['data'][i], datacfg.int_bits, datacfg.frac_bits)
@@ -219,7 +213,7 @@ if __name__ == '__main__':
         model_path = os.path.join(compiler_path,net,"crypto") 
     else:
         model_path = os.path.join(compiler_path,net)
-    
+
     inp_path = '/HybridCiM/data/dataset/default_input.npy'
     inp = np.load(inp_path, allow_pickle=True, encoding='latin1').item()
     inp['data'] = quantize_to_fixed(inp['data'])
